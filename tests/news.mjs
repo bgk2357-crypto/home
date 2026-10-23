@@ -1,0 +1,55 @@
+import assert from 'node:assert/strict';
+import { build } from 'esbuild';
+import { mkdir, readFile, readdir } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
+
+const directory = new URL('../.sites-runtime/tests/', import.meta.url);
+await mkdir(directory, {recursive:true});
+const sqlite = new DatabaseSync(':memory:');
+for (const name of (await readdir(new URL('../drizzle/',import.meta.url))).filter(value=>value.endsWith('.sql')).sort()) sqlite.exec(await readFile(new URL('../drizzle/'+name,import.meta.url),'utf8'));
+globalThis.newsTestEnv={DB:{prepare(sql){let args=[];return {bind(...values){args=values;return this;},async first(){return sqlite.prepare(sql).get(...args)??null;},async run(){return sqlite.prepare(sql).run(...args);}};}}};
+const plugin={name:'news-env',setup(context){
+  context.onResolve({filter:/^cloudflare:workers$/},()=>({path:'env',namespace:'test'}));
+  context.onLoad({filter:/.*/,namespace:'test'},()=>({contents:'export const env=globalThis.newsTestEnv;'}));
+}};
+for(const [name,entry] of [['parser','lib/news-parser.ts'],['sources','lib/news-sources.ts'],['service','lib/news-service.ts']])await build({entryPoints:[entry],outfile:fileURLToPath(new URL('news-'+name+'.mjs',directory)),bundle:true,platform:'node',format:'esm',plugins:[plugin]});
+const parser=await import(new URL('news-parser.mjs',directory));
+const {NEWS_SOURCES}=await import(new URL('news-sources.mjs',directory));
+const service=await import(new URL('news-service.mjs',directory));
+let checks=0;function equal(a,b){assert.deepEqual(a,b);checks++;}
+const general=NEWS_SOURCES.find(x=>x.id==='news-safety');
+const notice=NEWS_SOURCES.find(x=>x.id==='moel-notice');
+const kiha=NEWS_SOURCES.find(x=>x.id==='kiha-notice');
+const today=new Date().toISOString().slice(0,10);
+const xml=`<rss><channel><item><title><![CDATA[산업안전 &amp; 화학물질 누출 &#xC0AC;고 - 테스트신문]]></title><link>https://example.com/news?id=1&amp;utm_source=test</link><pubDate>${today}T09:00:00+09:00</pubDate><source url="https://example.com">테스트신문</source></item></channel></rss>`;
+const parsed=parser.parseRss(xml,general);
+equal(parsed.length,1);equal(parsed[0].title,'산업안전 & 화학물질 누출 사고');equal(parsed[0].publisher,'테스트신문');
+equal(parsed[0].url,'https://example.com/news?id=1');equal(parsed[0].topics,['안전','화학물질']);
+equal(parser.parsePublishedDate('2026.10.23'),'2026-10-22T15:00:00.000Z');
+equal(parser.articleUrl('javascript:alert(1)',general.url,false),null);equal(parser.articleUrl('',general.url,false),null);
+equal(parser.articleUrl('https://evil.test/a',notice.url,true),null);
+assert.throws(()=>parser.parseRss('<html>blocked</html>',notice));checks++;
+const rows=`<table><tr><td><a href="community_view.htm?uid=1&amp;tbn=gongi">[정보마당] 산업보건 화학물질 포럼</a></td><td>${today}</td></tr></table>`;
+equal(parser.parseBoard(rows,kiha)[0].url,'https://www.kiha.kr/main/community_view.htm?uid=1&tbn=gongi');
+equal(parser.parseBoard(rows,kiha)[0].publishedAt,parser.parsePublishedDate(today));
+equal(parser.deduplicateArticles([parsed[0],{...parsed[0],url:'https://example.com/another'}]).length,1);
+equal(parser.parseKosha({result:'success',payload:[{pstNm:'안전 알림',wrtDt:today,contentsLinkUrl:'https://evil.test/x'}]},NEWS_SOURCES[0]).length,0);
+const originalFetch=globalThis.fetch;let calls=0,fail=false;
+globalThis.fetch=async(url)=>{
+  calls++;if(fail)throw Error('source-unavailable');
+  const source=NEWS_SOURCES.find(item=>item.url===url);
+  if(source.format==='kosha')return Response.json({result:'success',payload:[{pstNm:'화학물질 누출사고 안전 알림',wrtDt:today,contentsLinkUrl:'/community/notice?bbsId=test&pstNo='+source.id}]});
+  if(source.format==='board')return new Response(source.id==='kiha-notice'?rows:`<table><tr><td><a href="enewsView.do?news_seq=1">산업안전 감독 결과</a></td><td>${today}</td></tr></table>`);
+  return new Response(source.kind==='general'?xml:xml.replace('https://example.com/news?id=1&amp;utm_source=test','https://www.moel.go.kr/news/notice/noticeView.do?bbs_seq=1'));
+};
+const first=await service.getNews('trends');equal(calls,6);equal(first.sources.every(x=>x.status==='ok'),true);assert.ok(first.articles.length>0);checks++;
+await service.getNews('trends');equal(calls,6);
+sqlite.prepare("UPDATE news_feed_cache SET checked_at=? WHERE source_id='kosha-notice'").run(new Date(Date.now()-31*60000).toISOString());
+fail=true;const stale=await service.getNews('trends');equal(calls,7);equal(stale.sources[0].status,'stale');equal(stale.articles.length,first.articles.length);
+await service.getNews('trends');equal(calls,7);
+const unavailable=await service.getNews('general');equal(unavailable.articles.length,0);equal(unavailable.sources.every(x=>x.status==='unavailable'),true);
+fail=false;sqlite.prepare("UPDATE news_feed_cache SET checked_at=? WHERE source_id='kosha-notice'").run(new Date(Date.now()-6*60000).toISOString());
+equal((await service.getNews('trends')).sources[0].status,'ok');
+globalThis.fetch=originalFetch;sqlite.close();
+console.log(`${checks} news checks passed: RSS/HTML/API parsing, Korean dates, filtering, URL safety, deduplication, persistent cache, stale fallback and retries.`);

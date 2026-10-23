@@ -6,6 +6,7 @@ import { signInPath, getUser } from "../auth";
 import { NaverMap } from "../naver-map";
 import { setting } from "../runtime-config";
 import { CommunityBoard } from "../community-board";
+import { NewsFeed } from "../news-feed";
 import { displayDate, getEntries, getMember, getPosts, pageNumber } from "../data";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ function Information({ path }: { path: string }) {
   else if (path === "/company/organization") content = <div className="prose"><h2>조직도</h2><div className="location-box"><strong>대표 김지훈</strong><p>Argo&Health Lab</p></div><p>부서와 담당자 정보는 확정 후 등록합니다.</p></div>;
   else if (category === "business" && path !== "/business/achievements") { const service = services.find(item => item.href === path)!; content = <div className="prose"><h2>{service.title}</h2><p>{service.description}</p><h3>상담 시 함께 살펴볼 내용</h3><ul>{service.points.map(point => <li key={point}>{point}</li>)}</ul><p>구체적인 제공 범위와 일정은 사업장의 상황을 확인한 뒤 협의합니다.</p><a className="button" href="/qna">회원 Q&A로 문의하기 →</a></div>; }
   else if (category === "resources") content = <LegalResources path={path} />;
+  else if (path === "/news/trends" || path === "/news/general") content = <NewsFeed kind={path === "/news/trends" ? "trends" : "general"} />;
   else content = <EmptyState title={category === "news" ? "아직 등록된 소식이 없습니다" : "내용 등록 예정"} description={path === "/company/history" ? "확인된 회사 연혁을 준비하고 있습니다." : path === "/business/achievements" ? "공개 가능한 수행 실적을 정리해 등록할 예정입니다." : "등록된 소식은 이 페이지에서 확인할 수 있습니다."} />;
   return <><PageHeading eyebrow={navigation.find(item => item.children.some(([, href]) => href === path))?.label ?? "안내"} title={title} description={category === "company" ? "사람과 현장을 생각하는 Argo&Health Lab을 소개합니다." : category === "business" ? "사업장의 안전과 건강을 위한 사업범위를 안내합니다." : category === "resources" ? "안전보건 관련 공식 자료를 확인하세요." : newsGroups.find(item => item.href === path)?.description ?? "산업보건 소식을 안내합니다."} /><Subnav category={category} current={path} /><section className="content-panel">{content}</section></>;
 }

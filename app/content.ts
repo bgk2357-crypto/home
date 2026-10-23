@@ -13,6 +13,6 @@ export const services = [
 ];
 export const newsGroups = [
   { title: "공지사항", href: "/news/notices", description: "회사 소식과 서비스 안내를 확인하세요." },
-  { title: "산업보건동향", href: "/news/trends", description: "산업보건 분야의 소식을 모아 안내합니다." },
-  { title: "일반뉴스", href: "/news/general", description: "함께 나눌 일터와 건강 이야기를 소개합니다." },
+  { title: "산업보건동향", href: "/news/trends", description: "안전보건공단·고용노동부·산업보건학회의 공지와 알림을 모았습니다." },
+  { title: "일반뉴스", href: "/news/general", description: "안전·보건·화학물질 누출·사망사고·화재 관련 뉴스를 모았습니다." },
 ];
