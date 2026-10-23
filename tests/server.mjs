@@ -39,7 +39,7 @@ async function submit(action, values, origin = 'https://test.local') {
 }
 await signIn(null);
 check((await submit('qna', { title: '문의', body: '안녕하세요' })).status, 401);
-check((await submit('community', { title: '이야기', body: '안녕하세요' })).status, 401);
+check((await submit('community', { title: '이야기', body: '안녕하세요' })).headers.get('location'), 'https://test.local/community?error=invalid');
 check((await submit('guestbook', { author: '방문자', body: '응원합니다' })).headers.get('location'), 'https://test.local/guestbook?saved=1');
 check((await data.getEntries(1)).total, 1);
 check((await submit('guestbook', { author: '  ', body: '내용' })).headers.get('location'), 'https://test.local/guestbook?error=invalid');
@@ -61,7 +61,7 @@ check((await submit('qna', { title: '비공개 문의', body: '문의 내용', u
 check((await data.getPosts('qna', 1, 'google:alice')).total, 1);
 check((await data.getPosts('qna', 1, 'google:alice')).items[0].author, '회원A');
 check((await data.getPosts('qna', 1, 'google:bob')).total, 0);
-await submit('community', { title: '공개 이야기', body: '함께 나누는 글' });
+await submit('community', { author: '비회원 A', title: '공개 이야기', body: '함께 나누는 글' });
 await signIn(null);
 check((await data.getPosts('community', 1)).total, 1);
 for (let index = 0; index < 10; index++) await submit('guestbook', { author: '방문자', body: `글${index}` });
@@ -79,13 +79,18 @@ check(await session.sessionUser('argo_session='+expired), null);
 check(session.safeReturnPath('//evil.test'), '/');
 check(session.safeReturnPath('/community?write=1'), '/community?write=1');
 await signIn('google:unregistered');
-check((await submit('community', {title:'로그인만 한 사용자',body:'별도 가입 없이 작성'})).headers.get('location'), 'https://test.local/community?saved=1');
+check((await submit('community', {author:'방문자',title:'로그인만 한 사용자',body:'별도 가입 없이 작성'})).headers.get('location'), 'https://test.local/community?saved=1');
 check((await data.getPosts('community',1)).total,2);
 const communityPost=(await data.getPosts('community',1)).items[0];
 check((await data.getCommunityPost(communityPost.id)).title,'로그인만 한 사용자');
 const privatePost=(await data.getPosts('qna',1,'google:alice')).items[0];
 check(await data.getCommunityPost(privatePost.id), null);
 globalThis.testHeaders = new Headers({'oai-authenticated-user-id':'google:forged','oai-authenticated-user-email':'forged@test'});
-check((await submit('community',{title:'위조',body:'차단'})).status,401);
+check((await submit('qna',{title:'위조',body:'차단'})).status,401);
+await signIn(null);
+check((await submit('community',{author:'비회원',title:'익명 작성',body:'비회원 저장 확인'})).headers.get('location'),'https://test.local/community?saved=1');
+check((await data.getPosts('community',1)).items[0].author,'비회원');
+check((await submit('community',{author:'방문자',title:'타 사이트',body:'차단'},'https://other.test')).status,403);
+check((await submit('community',{author:' '.repeat(2),title:'빈 이름',body:'내용'})).headers.get('location'),'https://test.local/community?error=invalid');
 sqlite.close();
 console.log(`${checks} server checks passed: anonymous guestbook, membership gate, Q&A isolation, SQL values, ordering and pagination.`);
