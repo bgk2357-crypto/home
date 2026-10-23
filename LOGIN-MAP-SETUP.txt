@@ -1,0 +1,41 @@
+구글 로그인과 네이버 지도 설정
+
+1. Google Cloud Console https://console.cloud.google.com/ 에서 프로젝트를 선택/생성합니다.
+2. Google Auth Platform에서 브랜딩, 대상(외부), 연락처와 테스트 사용자를 설정합니다.
+3. 클라이언트에서 OAuth 클라이언트를 생성하고 유형을 '웹 애플리케이션'으로 선택합니다.
+4. 승인된 리디렉션 URI에 다음 주소를 정확히 등록합니다.
+   로컬 테스트: http://localhost:5173/auth/google/callback
+   외부 배포: https://실제서비스주소/auth/google/callback
+5. .dev.vars.example을 .dev.vars로 복사하고 GOOGLE_CLIENT_ID와 GOOGLE_CLIENT_SECRET을 입력합니다.
+6. AUTH_SECRET에는 충분히 긴 무작위 문자열(32자 이상)을 입력합니다.
+   PowerShell에서 프로젝트에 설치한 Node로 생성할 수 있습니다.
+   & .\.sites-runtime\node-v22.16.0-win-x64\node.exe -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"
+7. APP_ORIGIN은 주소 끝의 / 없이 등록한 홈페이지 주소를 입력합니다.
+   로컬 테스트: http://localhost:5173
+8. 개발 서버를 재시작합니다. 현재 컴퓨터에서 http://localhost:5173/login 으로 테스트합니다.
+
+중요: 구글 웹 OAuth는 http://192.168.0.37 같은 내부망 IP를 리디렉션 URI로 허용하지 않습니다.
+다른 기기에서 로그인하려면 HTTPS 도메인으로 배포한 주소를 등록해야 합니다.
+내부망에서는 일반 페이지·방명록·공개 게시판을 확인하고, 구글 로그인은 현재 PC의 localhost에서 테스트하세요.
+구글 동의 화면이 테스트 상태이면 등록한 테스트 사용자만 로그인할 수 있습니다.
+구글 로그인 후 커뮤니티는 바로 작성할 수 있습니다. Q&A는 홈페이지 회원가입까지 완료해야 합니다.
+기존 ChatGPT 회원은 Google 회원과 다른 식별자를 사용하므로 자동으로 연결되지 않습니다.
+
+네이버 지도
+1. NAVER Cloud Platform 콘솔에서 Maps 애플리케이션을 만듭니다.
+2. Dynamic Map과 Geocoding을 활성화하고 접속할 웹 서비스 URL을 등록합니다.
+3. 발급한 Key ID를 .dev.vars의 NAVER_MAP_CLIENT_ID에 입력하고 서버를 재시작합니다.
+4. 찾아오는길에 팔곡일동 지역을 중심으로 지도를 표시합니다. 정확한 회사 위치를 표시하는 핀은 아닙니다.
+키를 등록하기 전에도 '네이버 지도 · 길찾기'를 누르면 팔곡일동 검색 화면이 열립니다.
+
+.dev.vars와 비밀 키는 GitHub에 올리지 마세요. 배포 시에는 호스팅 서비스의 환경변수/Secret에 등록합니다.
+Render는 현재 Cloudflare 전용 코드의 운영 대상이 아니며 별도 전환이 필요합니다.
+
+실행(프로젝트에 설치한 Node 사용)
+cd C:\home
+$env:PATH = 'C:\home\.sites-runtime\node-v22.16.0-win-x64;' + $env:PATH
+node scripts/run-framework.mjs dev --hostname 0.0.0.0
+
+방명록 오류 원인과 수정
+로컬 D1에 guestbook 등 테이블이 없어 'no such table: guestbook' 오류가 발생했습니다.
+개발 서버 시작 시 drizzle 마이그레이션을 로컬 DB에 적용합니다. 기존 데이터는 삭제하지 않습니다.

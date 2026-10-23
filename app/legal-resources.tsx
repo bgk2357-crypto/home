@@ -2,8 +2,9 @@ import { lawGroups, lawSearchUrl, lawTextUrl } from "./laws";
 
 export function LegalResources({ path }: { path: string }) {
   if (path === "/resources/guidelines") return <>
-    <p className="notice">한국산업안전보건공단에서 안전보건기술지침(KOSHA GUIDE)을 확인하세요.</p>
-    <div className="legal-links"><a href="https://www.kosha.or.kr" target="_blank" rel="noopener noreferrer"><span><strong>한국산업안전보건공단</strong><small>공단의 공식 기술지침 자료 확인</small></span><span aria-hidden="true">↗</span></a></div>
+    <p className="notice">안전보건공단의 기술지원규정(KOSHA GUIDE)을 공식 포털에서 확인하세요. 지침명이나 지침번호로 검색할 수 있습니다.</p>
+    <div className="legal-links"><a href="https://smartsearch.kosha.or.kr/" target="_blank" rel="noopener noreferrer"><span><strong>KOSHA GUIDE 검색</strong><small>안전보건공단 스마트검색 · 지침명이나 지침번호 입력 후 기술지침 자료 확인</small></span><span aria-hidden="true">↗</span></a><a href="https://portal.kosha.or.kr/archive/resources/tech-support/revision/RevisionNoticePage" target="_blank" rel="noopener noreferrer"><span><strong>기술지원규정 제·개정 공지</strong><small>안전보건공단 공식 포털 · 최신 제·개정 자료 확인</small></span><span aria-hidden="true">↗</span></a></div>
+    <p className="muted">공식 포털에서 ‘산재예방 정보 → 가이드 → 기술지원규정(KOSHA GUIDE)’ 메뉴로도 찾아갈 수 있습니다.</p>
   </>;
   const group = lawGroups[path];
   if (!group) return null;

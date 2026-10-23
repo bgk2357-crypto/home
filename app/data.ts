@@ -17,3 +17,7 @@ export async function getPosts(kind: "qna" | "community", page: number, userId?:
 }
 export function displayDate(value: string) { return new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(value)); }
 export function pageNumber(value?: string) { const page = Number(value); return Number.isInteger(page) && page >= 1 ? Math.min(page, 10000) : 1; }
+export async function getCommunityPost(id: number) {
+  if (!Number.isSafeInteger(id) || id < 1) return null;
+  return await getDb().select().from(posts).where(and(eq(posts.id, id), eq(posts.kind, "community"))).get() ?? null;
+}

@@ -1,0 +1,7 @@
+# Copy to .dev.vars, then fill in the real values. Never commit .dev.vars.
+GOOGLE_CLIENT_ID=""
+GOOGLE_CLIENT_SECRET=""
+AUTH_SECRET=""
+APP_ORIGIN="http://localhost:5173"
+# Optional: NAVER Cloud Maps application key ID. Enable Dynamic Map and Geocoding.
+NAVER_MAP_CLIENT_ID=""

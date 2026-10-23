@@ -1,5 +1,5 @@
 import { env } from "cloudflare:workers";
-import { getChatGPTUser } from "../../chatgpt-auth";
+import { getUser } from "../../auth";
 import { getMember } from "../../data";
 
 export const dynamic = "force-dynamic";
@@ -22,10 +22,10 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) return new Response("다른 사이트에서의 제출은 허용하지 않습니다.", { status: 403 });
   // 회원 글은 본문을 받기 전에 서버에서 로그인과 회원등록 여부를 확인합니다.
-  const user = action === "guestbook" ? null : await getChatGPTUser();
+  const user = action === "guestbook" ? null : await getUser();
   if (action !== "guestbook" && !user) return new Response("로그인 후 이용해주세요.", { status: 401, headers: { "Cache-Control": "no-store" } });
   const member = action === "qna" || action === "community" ? await getMember(user!.userId) : null;
-  if ((action === "qna" || action === "community") && !member) return new Response("홈페이지 회원가입 후 작성할 수 있습니다.", { status: 403 });
+  if (action === "qna" && !member) return new Response("홈페이지 회원가입 후 작성할 수 있습니다.", { status: 403 });
   const form = await readForm(request); const path = action === "join" ? "/join" : `/${action}`;
   if (!form) return go(request, `${path}?error=invalid`);
   const db = env.DB; if (!db) return go(request, `${path}?error=busy`);
@@ -45,7 +45,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     }
     const title = field(form, "title", 100); const body = field(form, "body", 2000);
     if (!title || !body) return go(request, `${path}?error=invalid`);
-    const result = await db.prepare("INSERT INTO posts (kind, user_id, author, title, body, created_at) SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM posts WHERE user_id = ?) < 1000").bind(action, user!.userId, member!.displayName, title, body, now, user!.userId).run();
+    const result = await db.prepare("INSERT INTO posts (kind, user_id, author, title, body, created_at) SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM posts WHERE user_id = ?) < 1000").bind(action, user!.userId, (member?.displayName ?? user!.displayName), title, body, now, user!.userId).run();
     return go(request, result.meta.changes ? `${path}?saved=1` : `${path}?error=capacity`);
   } catch { return go(request, `${path}?error=busy`); }
 }
