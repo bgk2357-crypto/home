@@ -36,6 +36,7 @@ yarn-error.log*
 /.wrangler/
 /.sites-runtime/
 /.data/
+/public/vendor/
 
 # Workspace scaffolding and publication archives
 /.agents/

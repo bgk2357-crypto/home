@@ -7,6 +7,8 @@ import { NaverMap } from "../naver-map";
 import { setting } from "../runtime-config";
 import { CommunityBoard } from "../community-board";
 import { NewsFeed } from "../news-feed";
+import { StatisticsBoard } from "../statistics-board";
+import { MsdsWorkspace } from "../msds-workspace";
 import { displayDate, getEntries, getMember, getPosts, pageNumber } from "../data";
 
 export const dynamic = "force-dynamic";
@@ -56,6 +58,8 @@ function Information({ path }: { path: string }) {
   else if (path === "/company/location") content = <div className="prose"><h2>Argo&Health Lab 찾아오는길</h2><div className="location-box"><strong>{company.address}</strong><p>방문 전 연락주시면 상세 위치를 안내해드립니다.</p><a className="button" href="tel:01076519208">{company.phone} 전화하기 →</a></div><NaverMap clientId={setting("NAVER_MAP_CLIENT_ID")} /><a className="button secondary" href="https://map.naver.com/p/search/%EA%B2%BD%EA%B8%B0%EB%8F%84%20%EC%95%88%EC%82%B0%EC%8B%9C%20%EC%83%81%EB%A1%9D%EA%B5%AC%20%ED%8C%94%EA%B3%A1%EC%9D%BC%EB%8F%99" target="_blank" rel="noopener noreferrer">주변 지역 지도 보기 ↗</a></div>;
   else if (path === "/company/organization") content = <div className="prose"><h2>조직도</h2><div className="location-box"><strong>대표 김지훈</strong><p>Argo&Health Lab</p></div><p>부서와 담당자 정보는 확정 후 등록합니다.</p></div>;
   else if (category === "business" && path !== "/business/achievements") { const service = services.find(item => item.href === path)!; content = <div className="prose"><h2>{service.title}</h2><p>{service.description}</p><h3>상담 시 함께 살펴볼 내용</h3><ul>{service.points.map(point => <li key={point}>{point}</li>)}</ul><p>구체적인 제공 범위와 일정은 사업장의 상황을 확인한 뒤 협의합니다.</p><a className="button" href="/qna">회원 Q&A로 문의하기 →</a></div>; }
+  else if (path === "/resources/msds") content = <MsdsWorkspace />;
+  else if (path === "/news/statistics") content = <StatisticsBoard />;
   else if (category === "resources") content = <LegalResources path={path} />;
   else if (path === "/news/trends" || path === "/news/general") content = <NewsFeed kind={path === "/news/trends" ? "trends" : "general"} />;
   else content = <EmptyState title={category === "news" ? "아직 등록된 소식이 없습니다" : "내용 등록 예정"} description={path === "/company/history" ? "확인된 회사 연혁을 준비하고 있습니다." : path === "/business/achievements" ? "공개 가능한 수행 실적을 정리해 등록할 예정입니다." : "등록된 소식은 이 페이지에서 확인할 수 있습니다."} />;

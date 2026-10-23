@@ -3,8 +3,8 @@ import { useState } from "react";
 import { INDUSTRIAL_STATISTICS, STATISTICS_CHECKED_AT, STATISTICS_SOURCES, musculoskeletalTotal, poisoningTotal } from "../lib/industrial-statistics";
 
 const number = (value: number) => value.toLocaleString("ko-KR");
-export function IndustrialStatistics() {
-  const [year, setYear] = useState(2025);
+export function IndustrialStatistics({ initialYear = 2025 }: { initialYear?: number }) {
+  const [year, setYear] = useState(initialYear);
   const row = INDUSTRIAL_STATISTICS.find(item => item.year === year)!;
   const previous = INDUSTRIAL_STATISTICS.find(item => item.year === year - 1);
   const [metric, setMetric] = useState("deaths");

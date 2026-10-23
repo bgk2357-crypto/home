@@ -1,0 +1,3 @@
+GHS01.svg through GHS09.svg were downloaded from the NIH PubChem public GHS image set:
+https://pubchem.ncbi.nlm.nih.gov/images/ghs/GHS01.svg (and GHS02 through GHS09)
+Retrieved 2026-10-23. Standard GHS hazard pictograms; no symbols were redrawn or AI-generated.

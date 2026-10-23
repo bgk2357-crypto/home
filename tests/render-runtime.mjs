@@ -43,7 +43,10 @@ async function stop(){if(child&&child.exitCode===null){const exited=once(child,'
 async function submit(action,values,extra={}){return fetch(base+'/actions/'+action,{method:'POST',headers:{Origin:base,'Content-Type':'application/x-www-form-urlencoded',...extra},body:new URLSearchParams(values),redirect:'manual'});}
 try{
   await launch();
-  let r=await fetch(base+'/');let html=await r.text();assert.equal(r.status,200);assert.ok(html.includes('숫자로 보는 산업재해'));assert.ok(html.includes('147,130'));assert.ok(html.includes('2023'));assert.ok(html.includes('미수록'));
+  let r=await fetch(base+'/');let html=await r.text();assert.equal(r.status,200);assert.ok(!html.includes('id="industrial-statistics-title"'));
+  html=await(await fetch(base+'/news/statistics')).text();assert.ok(html.includes('연도별 산업재해 통계'));assert.ok(html.includes('147,130'));assert.ok(html.includes('미수록'));
+  html=await(await fetch(base+'/resources/msds')).text();assert.ok(html.includes('MSDS 분석'));assert.ok(html.includes('msds-files'));assert.ok(html.includes('.hwp'));
+  assert.equal((await fetch(base+'/vendor/pdf.worker.min.mjs')).status,200);assert.equal((await fetch(base+'/ghs/GHS02.svg')).status,200);
   r=await fetch(base+'/community?write=1');html=await r.text();assert.ok(html.includes('name="author"'));assert.ok(html.includes('비회원 글쓰기'));assert.ok(!html.includes('로그인 후 글쓰기'));
   r=await submit('guestbook',{author:'Render 확인',body:'render-guestbook-persistence'});assert.equal(r.status,303);assert.ok(r.headers.get('location').endsWith('?saved=1'));
   r=await submit('community',{author:'비회원 확인',title:'render-anonymous-title',body:'<script>test-only</script>'});assert.equal(r.status,303);assert.ok(r.headers.get('location').endsWith('?saved=1'));
