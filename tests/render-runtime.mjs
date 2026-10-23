@@ -5,6 +5,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { build } from 'esbuild';
 import { openDatabase } from '../scripts/node-env.mjs';
+import { DatabaseSync } from 'node:sqlite';
 
 const databasePath = path.resolve('.sites-runtime/tests/render-'+randomUUID()+'.sqlite');
 let database = openDatabase(databasePath);
@@ -12,6 +13,13 @@ await database.prepare('INSERT INTO guestbook(author,body,created_at) VALUES (?,
 database.close(); database = openDatabase(databasePath);
 assert.equal(await database.prepare('SELECT COUNT(*) AS total FROM guestbook').first('total'),1);
 assert.deepEqual(await database.prepare('SELECT author,body FROM guestbook').raw(),[['동작 검증','persisted']]);
+const probe = new DatabaseSync(':memory:');
+const prototype = Object.getPrototypeOf(probe.prepare('SELECT 1'));
+const nativeSetReturnArrays = prototype.setReturnArrays;
+try {
+  prototype.setReturnArrays = undefined;
+  assert.deepEqual(await database.prepare('SELECT author,body FROM guestbook').raw(),[['동작 검증','persisted']]);
+} finally { prototype.setReturnArrays = nativeSetReturnArrays; probe.close(); }
 database.close();
 await build({entryPoints:['lib/industrial-statistics.ts'],outfile:'.sites-runtime/tests/statistics.mjs',bundle:true,platform:'node',format:'esm'});
 const {INDUSTRIAL_STATISTICS:rows,poisoningTotal,musculoskeletalTotal}=await import('../.sites-runtime/tests/statistics.mjs');

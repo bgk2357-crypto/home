@@ -40,7 +40,7 @@ const localBindingConfig = {
 
 export default defineConfig(async ({ command }) => {
   configureToolEnvironment(process.cwd());
-  if (process.env.DEPLOY_TARGET === "node") {
+  if (process.env.DEPLOY_TARGET === "node" || process.env.RENDER === "true") {
     return {
       plugins: [vinext()],
       resolve: { alias: { "cloudflare:workers": fileURLToPath(new URL("./scripts/node-env.mjs", import.meta.url)) } },
