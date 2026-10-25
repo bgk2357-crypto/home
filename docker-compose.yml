@@ -1,0 +1,36 @@
+version: "2.4"
+
+services:
+  homepage:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${NAS_HTTP_PORT:-8080}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      SQLITE_PATH: /var/data/argo.sqlite
+      APP_ORIGIN: "${APP_ORIGIN:-}"
+      AUTH_SECRET: "${AUTH_SECRET:-}"
+      GOOGLE_CLIENT_ID: "${GOOGLE_CLIENT_ID:-}"
+      GOOGLE_CLIENT_SECRET: "${GOOGLE_CLIENT_SECRET:-}"
+      NAVER_MAP_CLIENT_ID: "${NAVER_MAP_CLIENT_ID:-}"
+      VINEXT_TRUSTED_HOSTS: "${VINEXT_TRUSTED_HOSTS:-}"
+    volumes:
+      - homepage-data:/var/data
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  homepage-data:
