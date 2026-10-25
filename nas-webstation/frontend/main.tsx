@@ -16,7 +16,7 @@ function translateLinks() {
     const value = element.getAttribute(attr) || '';
     if (value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/index.php') && !/\.(svg|hwpx|pdf|mjs)(?:[?#]|$)/i.test(value)) element.setAttribute(attr, routeUrl(value));
     if (element.tagName === 'FORM' && element.getAttribute('method')?.toLowerCase() === 'post' && context && !element.querySelector('input[name="_csrf"]')) {
-      const input = document.createElement('input'); input.type = 'hidden'; input.name = '_csrf'; input.value = context.csrf; element.append(input);
+      const input = document.createElement('input'); input.type = 'hidden'; input.name = '_csrf'; input.value = context.csrf; element.appendChild(input);
     }
   }
 }

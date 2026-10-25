@@ -1,6 +1,16 @@
 시놀로지 Web Station 배포 — Docker/Node.js 없이 실행
 대상: DS216+II / DSM 6.2.4, 도메인 ssk2357.synology.me
 
+확인된 NAS 환경 (2026-10-25)
+관리 화면: http://192.168.1.115:5000
+사용자가 Web Station/Apache/PHP 설치 완료를 알렸으며 PHP 버전은 7.4.30-0009입니다.
+이 배포본은 PHP 7.4 문법으로 작성되었으나, 해당 설치 버전은 아래 보안 수정 기준보다 낮습니다.
+외부 공개 전 PHP 패키지 업데이트 가능 여부를 확인하세요.
+Synology-SA-26:14 기준 PHP 7.4 보안 수정 버전은 7.4.33-0131 이상입니다.
+DSM 6.2에서 이 패키지를 제공하는지는 패키지 센터와 공식 호환성 안내로 확인해야 합니다.
+다른 DSM용 SPK를 강제로 설치하지 않습니다.
+현재 배포본 생성과 로컬 검증까지 완료했으며 NAS 업로드/설정은 아직 적용하지 않았습니다.
+
 유지한 기능
 - 기존 React 화면, 메뉴, 회사소개, 법령 검색·링크, 네이버 지도
 - Google 로그인/로그아웃, 홈페이지 회원가입, 회원정보
@@ -77,6 +87,10 @@ PHP: 위에서 만든 PHP 프로필
 소스 HTTPS / ssk2357.synology.me / 443
 대상 HTTP / 127.0.0.1 / 8081
 이때 기존 8080 Docker 규칙과 혼동하지 않습니다.
+역방향 프록시 사용 시 원래 Host와 X-Forwarded-Proto가 PHP까지 전달되어야 합니다.
+로그인 주소 오류 또는 글쓰기 403이 나면 사용자 지정 요청 헤더를 확인합니다.
+Host: ssk2357.synology.me
+X-Forwarded-Proto: https
 
 5. 도메인·인증서·공유기
 DSM DDNS의 ssk2357.synology.me가 집 공인 IP를 가리키도록 설정합니다.
@@ -118,3 +132,9 @@ Web Station의 PHP 요청을 멈춘 상태에서 data_dir 전체와 config.php�
 검증 범위는 전달 시 안내한 결과를 따릅니다.
 NAS의 실제 PHP 설정, OAuth 키, 인증서, 공유기 포워딩과 외부 접속까지
 검증해야 운영 배포가 완료됩니다. ZIP 생성만으로 NAS 설정이 바뀌지는 않습니다.
+
+소스에서 재빌드 (PC에서)
+npm ci
+npm run build:webstation
+생성 파일: outputs/synology-webstation.zip
+실제 NAS에는 ZIP 안의 결과물만 업로드합니다. Node.js는 NAS에 필요하지 않습니다.
