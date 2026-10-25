@@ -43,6 +43,7 @@ yarn-error.log*
 /.codex/
 /outputs/
 /work/
+/nas-webstation/config.php
 
 # OS metadata
 .DS_Store

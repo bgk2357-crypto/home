@@ -1,0 +1,120 @@
+시놀로지 Web Station 배포 — Docker/Node.js 없이 실행
+대상: DS216+II / DSM 6.2.4, 도메인 ssk2357.synology.me
+
+유지한 기능
+- 기존 React 화면, 메뉴, 회사소개, 법령 검색·링크, 네이버 지도
+- Google 로그인/로그아웃, 홈페이지 회원가입, 회원정보
+- 방명록, 비회원 커뮤니티 목록/상세/작성/페이지 이동
+- 본인만 읽는 회원 Q&A, 서버 권한 검사 및 입력 검증
+- 기관·뉴스 수집, 검색·필터·30분 갱신·캐시·장애 시 이전 자료
+- 산업재해 통계의 연도별 목록과 상세
+- MSDS PDF/HWP/HWPX/DOCX/TXT 분석, 브라우저 저장, Excel/HWPX 내보내기,
+  경고표지·유해성 안내 인쇄 (원본 프로젝트의 도구 코드를 재사용)
+Google/지도 키는 실제 발급받은 값을 서버 설정에 넣어야 사용할 수 있습니다.
+기존 버전에 없던 관리자 답변·메일 알림·파일 서버 업로드는 추가하지 않습니다.
+
+폴더 구조
+public/ : 웹에 공개할 루트. index.php, shell.html, assets, vendor, ghs, templates
+server/ : PHP 서버 코드와 마이그레이션
+config.example.php : 설정 예시. config.php는 설치 후 생성하며 ZIP에 포함하지 않음
+DB : /volume1/argo-homepage-data/argo.sqlite (web 공유 폴더 밖)
+원래 C:\home 프로젝트의 소스와 Node 배포 구성은 보존됩니다.
+
+1. NAS 패키지와 PHP 프로필
+패키지 센터에서 Web Station, Apache HTTP Server 2.4, PHP 7.4 이상을 설치합니다.
+패키지는 NAS에서 제공되는 최신 보안 업데이트를 적용한 버전을 사용합니다.
+PHP 7.4 문법으로 작성했으며 PHP 8에서도 사용할 수 있습니다.
+외부 공개 전 실제 PHP 패키지 버전을 확인해야 합니다.
+2026-10-22 Synology-SA-26:14의 PHP 취약점 수정 패키지가 발표되었습니다.
+공식 공지의 해당 PHP 패키지 수정 버전 이상인지 확인하세요.
+https://www.synology.com/en-us/security/advisory/Synology_SA_26_14
+
+Web Station > PHP 설정에서 홈페이지용 프로필을 만들고 다음 확장을 활성화합니다.
+curl, mbstring, pdo_sqlite (PDO 포함). session.upload_progress.enabled는 Off로 설정합니다.
+NAS에 설치된 PHP의 명령행 실행 파일과 Web Station 프로필 버전이 다를 수 있으므로
+php --version 또는 /usr/local/bin/php74 --version으로 확인하세요.
+
+2. 업로드
+synology-webstation.zip을 File Station에서 /volume1/web/argo에 압축 해제합니다.
+/volume1/web/argo/public/index.php가 존재해야 합니다.
+Web Station의 홈페이지 문서 루트는 반드시 /volume1/web/argo/public로 지정합니다.
+server나 config.php가 있는 상위 폴더를 문서 루트로 사용하지 않습니다.
+
+3. 비공개 설정과 저장 폴더
+방법 A — NAS SSH에서 설정 생성:
+cd /volume1/web/argo
+/usr/local/bin/php74 server/setup.php https://ssk2357.synology.me /volume1/argo-homepage-data
+PHP 실행 파일 이름은 설치한 버전에 맞게 바꾸세요.
+이미 config.php가 있으면 덮어쓰지 않습니다.
+
+방법 B — config.example.php를 config.php로 복사하고 직접 수정:
+app_origin: https://ssk2357.synology.me
+auth_secret: 무작위 32자 이상의 문자열
+data_dir: /volume1/argo-homepage-data
+google_client_id / google_client_secret: Google OAuth 키
+naver_map_client_id: 지도 Key ID (선택)
+
+data_dir에 해당하는 비공개 공유 폴더를 만들고 PHP 실행 계정/그룹 http에
+읽기·쓰기 권한을 부여합니다. 일반 방문자에게 파일 공유 권한은 부여하지 않습니다.
+config.php는 PHP 실행 계정이 읽을 수 있도록 설정하고 일반 사용자의 접근은 제한합니다.
+chmod 777은 사용하지 않습니다. 초기 설정 스크립트가 만든 config.php는 소유자만
+읽을 수 있으므로 NAS 권한 설정에서 http 계정/그룹 읽기 권한도 부여해야 합니다.
+PHP 프로필의 open_basedir에 /volume1/web/argo와 /volume1/argo-homepage-data 및
+NAS 기본 임시 경로를 포함합니다. 제한 전체를 해제할 필요는 없습니다.
+최초 요청 시 DB와 테이블이 자동 생성됩니다.
+
+4. Web Station 가상 호스트
+DSM 6 Web Station > 가상 호스트 > 생성:
+호스트 이름: ssk2357.synology.me
+문서 루트: web/argo/public
+HTTP 백엔드 서버: Apache HTTP Server 2.4
+PHP: 위에서 만든 PHP 프로필
+호스트 이름 기반 HTTPS 443 가상 호스트를 설정합니다.
+기존 서비스가 이 도메인/포트를 사용 중이면 덮어쓰지 말고 충돌을 먼저 확인합니다.
+시놀로지 UI가 443 가상 호스트 구성을 제한하거나 기존 역방향 프록시를 쓰고 있다면
+내부 HTTP 8081 가상 호스트를 만들고 다음 역방향 프록시로 연결할 수도 있습니다.
+제어판 > 응용 프로그램 포털 > 역방향 프록시:
+소스 HTTPS / ssk2357.synology.me / 443
+대상 HTTP / 127.0.0.1 / 8081
+이때 기존 8080 Docker 규칙과 혼동하지 않습니다.
+
+5. 도메인·인증서·공유기
+DSM DDNS의 ssk2357.synology.me가 집 공인 IP를 가리키도록 설정합니다.
+제어판 > 보안 > 인증서에서 이 도메인의 인증서를 발급하고 위 서비스에 적용합니다.
+공유기 TCP 외부 443 → 192.168.1.115 TCP 443으로 포워딩합니다.
+기존 외부 주소 ssk2357.synology.me:8080 대신 https://ssk2357.synology.me를 사용합니다.
+Let's Encrypt HTTP 인증을 사용할 때는 TCP 80도 NAS로 연결해야 할 수 있습니다.
+Synology DDNS의 DNS 인증을 사용하면 방식에 따라 80 포워딩 없이 발급할 수 있습니다.
+CGNAT 또는 이중 공유기라면 별도 네트워크 확인이 필요합니다.
+
+6. Google 로그인과 지도
+Google OAuth 승인된 리디렉션 URI를 정확히 아래 값으로 등록합니다.
+https://ssk2357.synology.me/index.php?route=%2Fauth%2Fgoogle%2Fcallback
+기존 Node 버전의 /auth/google/callback과 다른 주소이므로 반드시 추가합니다.
+주소의 route 값은 PHP가 보장하는 쿼리 라우팅이며 Apache rewrite 없이도 작동합니다.
+Google OAuth 웹 애플리케이션의 클라이언트 ID와 비밀 키를 config.php에 입력합니다.
+테스트 상태이면 Google 동의 화면에 테스트 사용자를 등록해야 합니다.
+네이버 지도 콘솔의 서비스 URL에도 https://ssk2357.synology.me를 등록합니다.
+키를 입력한 뒤 config.php 변경 내용은 다음 요청부터 반영됩니다.
+
+7. 검증
+홈페이지: https://ssk2357.synology.me
+상태 확인: https://ssk2357.synology.me/index.php?route=%2Fapi%2Fhealth
+status: ok, runtime: php가 나와야 합니다.
+다른 기기의 모바일 데이터로 접속해 인증서, 화면·메뉴, 방명록·커뮤니티 글쓰기,
+Google 로그인·가입·회원정보, 두 계정 간 Q&A 비공개, 뉴스, MSDS 내보내기·인쇄를 확인합니다.
+자료 도구는 브라우저 기능을 사용하므로 최신 Chrome/Edge 사용을 권장합니다.
+프로젝트 복사만으로 브라우저 IndexedDB의 MSDS 자료가 이전되지는 않습니다.
+
+8. 기존 게시판 DB 이전 및 백업
+원래 Node 버전과 같은 members/guestbook/posts/news_feed_cache 스키마를 사용합니다.
+Node 서버를 중지하고 SQLite DB를 정상 백업한 뒤 새 data_dir의 argo.sqlite에
+복원하면 됩니다. WAL 사용 중인 DB 파일 하나만 동작 중에 복사하지 마세요.
+Cloudflare D1/Render DB는 별도로 내보내야 하며 자동 이전되지 않습니다.
+Google user_id 형식은 동일하지만 새 비밀 키를 쓰면 다시 로그인해야 합니다.
+Web Station의 PHP 요청을 멈춘 상태에서 data_dir 전체와 config.php를 백업하세요.
+업데이트 시 public/server만 교체하고 config.php와 data_dir는 유지합니다.
+
+검증 범위는 전달 시 안내한 결과를 따릅니다.
+NAS의 실제 PHP 설정, OAuth 키, 인증서, 공유기 포워딩과 외부 접속까지
+검증해야 운영 배포가 완료됩니다. ZIP 생성만으로 NAS 설정이 바뀌지는 않습니다.

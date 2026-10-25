@@ -1,0 +1,91 @@
+DS216+II / DSM 6.2.4 — 외부 접속 설치
+
+현재 상태
+이 파일과 스크립트는 노트북에 준비된 설정입니다.
+실제 NAS·공유기·DNS에는 아직 적용되지 않았습니다.
+NAS 주소, 도메인, 관리 화면 접속이 확보되어야 원격 설정을 완료할 수 있습니다.
+
+접속 구조
+외부 방문자 → https://홈페이지도메인:443 → 공유기 → NAS:443
+→ DSM 역방향 프록시 → NAS 127.0.0.1:8080 → 컨테이너:3000
+DSM 관리 화면의 5000/5001 포트를 홈페이지 대상으로 지정하지 않습니다.
+설치 스크립트는 8080을 NAS 내부 루프백에만 연결합니다.
+따라서 NAS_IP:8080으로 다른 PC에서 직접 접속하는 구성과 다릅니다.
+
+1. 준비
+패키지 센터에서 Docker를 설치합니다.
+NAS의 내부 IP가 바뀌지 않도록 공유기 DHCP 예약 등을 설정합니다.
+홈페이지용 도메인 또는 사용 가능한 Synology DDNS 주소를 준비합니다.
+DSM 제어판 > 외부 액세스 > DDNS에서 Synology DDNS를 설정할 수 있습니다.
+기존 서비스가 같은 도메인의 443을 사용 중인지 먼저 확인합니다.
+홈페이지에는 별도의 호스트 이름을 사용하고 도메인의 루트(/)로 연결합니다.
+
+2. 소스 업로드 및 설치
+outputs/synology-homepage.zip을 NAS의 /volume1/docker/argo-homepage에 압축 해제합니다.
+Dockerfile과 scripts 폴더가 해당 폴더 바로 아래에 있어야 합니다.
+DSM 제어판 > 터미널 및 SNMP에서 SSH를 활성화한 후 PC에서 접속합니다.
+아래 NAS_IP·관리자계정·홈페이지도메인은 실제 값으로 바꾸세요.
+
+ssh 관리자계정@NAS_IP
+cd /volume1/docker/argo-homepage
+sudo sh scripts/synology-install.sh 홈페이지도메인
+
+스크립트가 Node 22/SQLite 실행 가능 여부를 확인한 뒤,
+무작위 AUTH_SECRET을 포함한 .env를 만들고 앱을 빌드·실행합니다.
+이전 .env가 있으면 덮어쓰지 않으며 도메인과 필수 설정을 확인합니다.
+기존 argo-homepage 컨테이너가 있으면 중단하므로 기존 배포를 지우지 않습니다.
+구형 NAS 커널과 Node 22 호환성 또는 NAS 메모리 부족으로 실패할 수 있습니다.
+그 경우 오류를 확인한 뒤 다음 단계로 진행하세요. 실제 NAS 실행은 미검증 상태입니다.
+
+3. HTTPS 인증서
+DSM 제어판 > 보안 > 인증서 > 추가에서 해당 도메인의 인증서를 등록합니다.
+Let's Encrypt 인증서 발급 시 도메인이 집 인터넷의 공인 IP를 가리켜야 합니다.
+일반 도메인의 HTTP 인증에는 공유기 TCP 80 → NAS TCP 80 연결이 필요합니다.
+Synology DDNS는 DNS 인증을 지원하므로 발급 방식에 따라 80 포트가 필요하지 않을 수 있습니다.
+인증서의 설정/구성에서 해당 역방향 프록시 서비스에 인증서를 지정합니다.
+
+4. DSM 6 역방향 프록시
+제어판 > 응용 프로그램 포털 > 역방향 프록시 > 생성
+설명: Argo 홈페이지
+소스 프로토콜: HTTPS
+소스 호스트 이름: 홈페이지도메인
+소스 포트: 443
+대상 프로토콜: HTTP
+대상 호스트 이름: 127.0.0.1
+대상 포트: 8080
+호스트 이름과 HTTPS 전달 정보가 앱까지 전달되어야 합니다.
+스크립트는 VINEXT_TRUSTED_HOSTS에 지정한 도메인만 등록합니다.
+게시판 작성 시 403이 발생하면 Host 및 X-Forwarded-Proto 전달을 확인하세요.
+
+5. 공유기 및 외부 접속
+공유기의 포트 포워딩에 TCP 외부 443 → NAS 내부 IP TCP 443을 설정합니다.
+기존 443 규칙이 다른 장치에 연결되어 있다면 기존 서비스와 연결 방식을 조정해야 합니다.
+DSM 방화벽을 사용하는 경우 홈페이지 HTTPS 443 접근을 허용합니다.
+8080, 3000 및 DSM 관리용 포트를 이 홈페이지 때문에 외부에 추가로 열 필요는 없습니다.
+휴대전화의 Wi-Fi를 끄고 이동통신으로 https://홈페이지도메인 에 접속합니다.
+이어 /api/health에서 status: ok와 runtime: node를 확인합니다.
+인증서, CSS·이미지, 메뉴 이동, 방명록 작성까지 확인해야 배포 완료입니다.
+
+외부 연결이 안 되면 DNS → 공유기 공인 IP → 443 포워딩 → NAS 방화벽
+→ 인증서 → 역방향 프록시 → 컨테이너 로그 순서로 점검합니다.
+통신사 CGNAT나 이중 공유기 환경에서는 포트 포워딩만으로 해결되지 않을 수 있습니다.
+그 경우 실제 네트워크 구조에 맞는 추가 설정이 필요합니다.
+
+6. Google 로그인 (선택)
+로그인·회원가입·회원 Q&A를 사용하려면 NAS의 .env에
+GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET을 설정합니다.
+Google OAuth 승인된 리디렉션 URI는 https://홈페이지도메인/auth/google/callback 입니다.
+.env는 비밀 키를 포함하므로 공개 저장소나 소스 ZIP에 넣지 않습니다.
+공개 홈페이지·비회원 게시판은 Google 키 없이도 사용할 수 있습니다.
+
+7. 환경변수 적용 및 업데이트
+환경변수를 바꿨다면 컨테이너 재생성이 필요합니다. 재시작만으로 적용되지 않습니다.
+기존 데이터가 있는 경우 먼저 중지한 상태에서 argo-homepage-data 볼륨을 백업합니다.
+동일한 볼륨을 유지하면서 컨테이너를 교체하세요.
+현재 NAS 및 백업 상태 확인 후 업데이트를 진행합니다.
+이 스크립트는 기존 컨테이너나 볼륨을 자동 삭제하지 않습니다.
+
+공식 참고
+https://kb.synology.com/en-au/DSM/help/DSM/AdminCenter/application_appportalias?version=6
+https://kb.synology.com/en-us/DSM/tutorial/How_to_enable_HTTPS_and_create_a_certificate_signing_request_on_your_Synology_NAS
+https://kb.synology.com/en-au/DSM/help/Docker/docker_desc?version=6

@@ -1,5 +1,9 @@
 시놀로지 NAS 배포 안내 — DS216+II / DSM 6.2.4-25556
 
+외부 HTTPS 접속용 최신 설치 절차는 SYNOLOGY-EXTERNAL-ACCESS.txt를 사용하세요.
+scripts/synology-install.sh가 도메인·비밀 키 설정과 컨테이너 실행을 준비합니다.
+아래 수동 설치는 내부망 테스트용 참고이며 두 방식으로 동시에 설치하지 않습니다.
+
 이 NAS에서는 아래 'DSM 6 설치' 절차를 먼저 사용하세요.
 Container Manager의 프로젝트 메뉴는 DSM 7용 안내이며 DSM 6에는 없습니다.
 
