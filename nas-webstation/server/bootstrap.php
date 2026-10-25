@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . "/membership.php";
 // PHP 7.4+; no Composer, Node.js or Docker needed on the NAS.
 function config() {
     static $config;
@@ -93,16 +94,12 @@ function db() {
     }
     return $db;
 }
-function member($identity) {
-    if (!$identity) return null;
-    $query = db()->prepare('SELECT user_id AS userId, display_name AS displayName, created_at AS createdAt FROM members WHERE user_id=?');
-    $query->execute([$identity['userId']]); return $query->fetch() ?: null;
-}
+function member($identity) { return $identity ? member_ensure($identity) : null; }
 function page_number($value) { return is_scalar($value) && ctype_digit((string)$value) ? max(1, min(10000, (int)$value)) : 1; }
 function list_page($kind, $page, $identity = null) {
     if ($kind === 'guestbook') { $from = 'guestbook'; $where = ''; $args = []; $columns = 'id,author,body,created_at AS createdAt'; }
-    else { $from = 'posts'; $where = ' WHERE kind=?'; $args = [$kind]; $columns = 'id,kind,user_id AS userId,author,title,body,created_at AS createdAt';
-        if ($kind === 'qna') { $where .= ' AND user_id=?'; $args[] = $identity['userId'] ?? ''; }
+    else { $from = 'posts'; $where = ' WHERE kind=?'; $args = [$kind]; $columns = 'id,kind,user_id AS userId,author,title,body,created_at AS createdAt,answer,answered_at AS answeredAt,answered_by AS answeredBy';
+        if ($kind === 'qna' && !member_master(member($identity))) { $where .= ' AND user_id=?'; $args[] = $identity['userId'] ?? ''; }
     }
     $query = db()->prepare('SELECT COUNT(*) FROM ' . $from . $where); $query->execute($args); $total = (int)$query->fetchColumn();
     $pages = max(1, (int)ceil($total / 10)); $current = min($page, $pages);

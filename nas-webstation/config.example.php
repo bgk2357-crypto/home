@@ -8,5 +8,6 @@ return [
     'google_client_id' => '',
     'google_client_secret' => '',
     'naver_map_client_id' => '',
+    'master_email' => 'bgk2357@gmail.com', // 최초 소유자 마스터 Google 계정
     'trusted_proxy_ips' => ['127.0.0.1', '::1'],
 ];

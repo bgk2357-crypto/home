@@ -5,7 +5,7 @@ import path from 'node:path';
 export function webstationAdapter() {
   const root = fileURLToPath(new URL('../', import.meta.url));
   const source = path.join(root, 'nas-webstation');
-  const replacements = new Map(['auth', 'data', 'runtime-config', 'auth/session'].map(name => [path.join(root, 'app', name).replaceAll('\\', '/'), path.join(source, 'frontend', name === 'auth/session' ? 'session.ts' : name + '.ts')]));
+  const replacements = new Map(['auth', 'data', 'runtime-config', 'auth/session', 'resource-data', 'member-store'].map(name => [path.join(root, 'app', name).replaceAll('\\', '/'), path.join(source, 'frontend', name === 'auth/session' ? 'session.ts' : name + '.ts')]));
   return {
     name: 'webstation-frontend-adapter', enforce: 'pre',
     resolveId(id, importer) {

@@ -1,0 +1,10 @@
+import {readFile,writeFile} from 'node:fs/promises';
+import {generateSQLiteDrizzleJson} from 'drizzle-kit/api';
+import * as schema from '../db/schema.ts';
+const previous=JSON.parse(await readFile('drizzle/meta/0002_snapshot.json','utf8'));
+const snapshot=await generateSQLiteDrizzleJson(schema,previous.id);
+await writeFile('drizzle/meta/0003_snapshot.json',JSON.stringify(snapshot,null,2)+'\n');
+const journal=JSON.parse(await readFile('drizzle/meta/_journal.json','utf8'));
+if(!journal.entries.some(e=>e.tag==='0003_member_grades'))journal.entries.push({idx:3,version:'6',when:1792939500000,tag:'0003_member_grades',breakpoints:true});
+await writeFile('drizzle/meta/_journal.json',JSON.stringify(journal,null,2)+'\n');
+console.log('Member grade schema and journal registered');

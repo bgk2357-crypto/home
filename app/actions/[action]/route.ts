@@ -1,3 +1,6 @@
+import { memberAction } from "../../member-actions";
+import { canWrite } from "../../../lib/membership";
+import { uploadResource } from "../../resource-actions";
 import { env } from "cloudflare:workers";
 import { getUser } from "../../auth";
 import { getMember } from "../../data";
@@ -18,14 +21,16 @@ async function readForm(request: Request) {
 }
 export async function POST(request: Request, { params }: { params: Promise<{ action: string }> }) {
   const { action } = await params;
+  if (["join","member-profile","paid-request","paid-cancel","admin-grade","admin-paid-review","qna-answer"].includes(action)) return memberAction(request,action);
+  if (action === "safety-resources") return uploadResource(request);
   if (!["guestbook", "join", "qna", "community"].includes(action)) return new Response("Not found", { status: 404 });
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) return new Response("다른 사이트에서의 제출은 허용하지 않습니다.", { status: 403 });
-  const publicWrite = action === "guestbook" || action === "community";
+  const publicWrite = action === "guestbook";
   const user = publicWrite ? null : await getUser();
   if (!publicWrite && !user) return new Response("로그인 후 이용해주세요.", { status: 401, headers: { "Cache-Control": "no-store" } });
-  const member = action === "qna" ? await getMember(user!.userId) : null;
-  if (action === "qna" && !member) return new Response("홈페이지 회원가입 후 작성할 수 있습니다.", { status: 403 });
+  const member = ["qna","community"].includes(action) ? await getMember(user!.userId) : null;
+  if (["qna","community"].includes(action) && !canWrite(member)) return new Response("홈페이지 회원가입 후 작성할 수 있습니다.", { status: 403 });
   const form = await readForm(request); const path = action === "join" ? "/join" : `/${action}`;
   if (!form) return go(request, `${path}?error=invalid`);
   const db = env.DB; if (!db) return go(request, `${path}?error=busy`);
@@ -46,9 +51,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     const title = field(form, "title", 100); const body = field(form, "body", 2000);
     if (!title || !body) return go(request, `${path}?error=invalid`);
     if (action === "community") {
-      const author = field(form, "author", 30);
+      const author = member!.displayName;
       if (!author) return go(request, "/community?error=invalid");
-      const result = await db.prepare("INSERT INTO posts (kind, user_id, author, title, body, created_at) SELECT 'community', ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM posts WHERE kind='community') < 10000").bind(`guest:${crypto.randomUUID()}`, author, title, body, now).run();
+      const result = await db.prepare("INSERT INTO posts (kind, user_id, author, title, body, created_at) SELECT 'community', ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM posts WHERE kind='community') < 10000").bind(user!.userId, author, title, body, now).run();
       return go(request, result.meta.changes ? "/community?saved=1" : "/community?error=capacity");
     }
     const result = await db.prepare("INSERT INTO posts (kind, user_id, author, title, body, created_at) SELECT ?, ?, ?, ?, ?, ? WHERE (SELECT COUNT(*) FROM posts WHERE user_id = ?) < 1000").bind(action, user!.userId, (member?.displayName ?? user!.displayName), title, body, now, user!.userId).run();

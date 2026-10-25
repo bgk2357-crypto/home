@@ -60,12 +60,12 @@ try {
   eq((await post('join', { displayName: '회원', consent: 'yes' })).status, 401);
   eq((await post('qna', { title: '문의', body: '내용' })).status, 401);
   eq((await post('qna', { title: '문의', body: '내용' }, 'unregistered')).status, 403);
-  r = await post('join', { displayName: '회원A' }, 'A'); assert.match(r.headers.get('location'), /error=consent/); checks++;
-  for (const id of ['A', 'B']) eq((await post('join', { displayName: '회원' + id, consent: 'yes' }, id)).status, 303);
+  r = await post('join', { displayName: '회원A' }, 'A'); assert.match(r.headers.get('location'), /error=invalid/); checks++;
+  for (const id of ['A', 'B']) eq((await post('join', { displayName: '회원' + id,businessName:'테스트 사업장',businessSize:'20~49인',contactName:'담당자',jobTitle:'과장',phone:'010-0000-0000',consent: 'yes' }, id)).status, 303);
   data = await page('/members', 'A'); eq(data.member.displayName, '회원A');
   eq((await post('qna', { title: 'A의 비공개 문의', body: '개인 문의 본문' }, 'A')).status, 303);
   eq((await page('/qna', 'A')).posts.total, 1); eq((await page('/qna', 'B', { user_id: 'google:A' })).posts.total, 0); eq((await page('/qna')).posts.total, 0);
-  eq((await post('community', { author: '비회원', title: '공개 게시글', body: '공개 본문' })).status, 303);
+  eq((await post('community', { author: '위조명', title: '공개 게시글', body: '공개 본문' }, 'A')).status, 303);
   data = await page('/community'); eq(data.posts.total, 1); const postId = data.posts.items[0].id;
   eq((await page('/community', null, { post: postId })).selected.title, '공개 게시글');
   eq((await page('/community', null, { post: postId - 1 })).selected, null);
@@ -87,7 +87,7 @@ try {
   await writeFile(configPath, `<?php return json_decode(base64_decode('${Buffer.from(JSON.stringify({ ...configuration, app_origin: publicOrigin })).toString('base64')}'), true);`);
   await launch();
   eq((await post('guestbook', { author: 'Proxy visitor', body: 'HTTPS guestbook' }, null, { Origin: publicOrigin })).status, 303);
-  eq((await post('community', { author: 'Proxy visitor', title: 'HTTPS community', body: 'Saved through proxy' }, null, { Origin: publicOrigin })).status, 303);
+  eq((await post('community', { author: 'Proxy visitor', title: 'HTTPS community', body: 'Saved through proxy' }, 'A', { Origin: publicOrigin })).status, 303);
   eq((await page('/guestbook')).entries.total, 2);
   eq((await page('/community')).posts.total, 2);
   eq((await post('guestbook', { author: 'a', body: 'b', _csrf: 'wrong' }, null, { Origin: publicOrigin })).status, 403);

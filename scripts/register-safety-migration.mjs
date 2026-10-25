@@ -1,0 +1,10 @@
+import { readFile,writeFile } from 'node:fs/promises';
+import { generateSQLiteDrizzleJson } from 'drizzle-kit/api';
+import * as schema from '../db/schema.ts';
+const previous=JSON.parse(await readFile('drizzle/meta/0001_snapshot.json','utf8'));
+const snapshot=await generateSQLiteDrizzleJson(schema,previous.id);
+await writeFile('drizzle/meta/0002_snapshot.json',JSON.stringify(snapshot,null,2)+'\n');
+const journal=JSON.parse(await readFile('drizzle/meta/_journal.json','utf8'));
+if(!journal.entries.some(entry=>entry.tag==='0002_safety_resources'))journal.entries.push({idx:2,version:'6',when:1792936800000,tag:'0002_safety_resources',breakpoints:true});
+await writeFile('drizzle/meta/_journal.json',JSON.stringify(journal,null,2)+'\n');
+console.log('Safety schema snapshot and migration journal registered');

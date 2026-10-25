@@ -6,15 +6,22 @@ import Login from '../../app/login/page';
 import { Header, Footer } from '../../app/components';
 import { context, routeUrl, setContext } from './context';
 import '../../app/globals.css';
+import '../../app/safety.css';
+import '../../app/membership.css';
 
 // Query routing runs on both Apache and nginx without rewrite modules.
 // Translate internal navigation and forms while retaining normal browser history,
 // full page navigation, new-tab links, and server-side POST/redirect semantics.
 function translateLinks() {
+  for (const input of document.querySelectorAll<HTMLInputElement>('input[type="file"][name="files"]')) input.name = 'files[]';
   for (const element of document.querySelectorAll<HTMLAnchorElement | HTMLFormElement>('a[href], form[action]')) {
     const attr = element.tagName === 'FORM' ? 'action' : 'href';
     const value = element.getAttribute(attr) || '';
-    if (value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/index.php') && !/\.(svg|hwpx|pdf|mjs)(?:[?#]|$)/i.test(value)) element.setAttribute(attr, routeUrl(value));
+    if (value.startsWith('/') && !value.startsWith('//') && !value.startsWith('/index.php') && !value.startsWith('/safety/') && !/\.(svg|hwpx|pdf|mjs)(?:[?#]|$)/i.test(value)) element.setAttribute(attr, routeUrl(value));
+    if (element.tagName === 'FORM' && element.getAttribute('method')?.toLowerCase() === 'get') {
+      const target = new URL(element.getAttribute('action') || '', location.origin);
+      if (target.pathname === '/index.php' && target.searchParams.has('route') && !element.querySelector('input[name="route"]')) { const input = document.createElement('input'); input.type = 'hidden'; input.name = 'route'; input.value = target.searchParams.get('route')!; element.appendChild(input); }
+    }
     if (element.tagName === 'FORM' && element.getAttribute('method')?.toLowerCase() === 'post' && context && !element.querySelector('input[name="_csrf"]')) {
       const input = document.createElement('input'); input.type = 'hidden'; input.name = '_csrf'; input.value = context.csrf; element.appendChild(input);
     }
@@ -33,6 +40,9 @@ async function start() {
   endpoint.searchParams.set('path', path);
   endpoint.searchParams.set('page', params.get('page') || '1');
   endpoint.searchParams.set('post', params.get('post') || '');
+  endpoint.searchParams.set('q', params.get('q') || '');
+  endpoint.searchParams.set('role', params.get('role') || '');
+  endpoint.searchParams.set('category', params.get('category') || '');
   const response = await nativeFetch(endpoint, { credentials: 'same-origin', cache: 'no-store' });
   if (!response.ok) throw new Error('홈페이지 데이터에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.');
   setContext(await response.json());

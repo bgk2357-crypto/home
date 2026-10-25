@@ -1,10 +1,11 @@
+import {openDatabase} from '../scripts/node-env.mjs';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
 globalThis.authTestEnv = {
-  GOOGLE_CLIENT_ID: 'test-client', GOOGLE_CLIENT_SECRET: 'test-secret',
+  DB:openDatabase(':memory:'), GOOGLE_CLIENT_ID: 'test-client', GOOGLE_CLIENT_SECRET: 'test-secret',
   AUTH_SECRET: 'test-only-session-secret-32-characters-minimum', APP_ORIGIN: 'http://localhost:5173',
 };
 const directory = new URL('../.sites-runtime/tests/', import.meta.url);
@@ -42,7 +43,7 @@ globalThis.fetch=async (url,options)=>{
 };
 const callbackUrl=origin+'/auth/google/callback?code=code&state='+google.searchParams.get('state');
 const success=await callback(new Request(callbackUrl,{headers:{cookie:flowCookie}}));
-equal(success.headers.get('location'),origin+'/community?write=1');equal(calls,2);
+equal(success.headers.get('location'),origin+'/members');equal(calls,2);
 const signedCookie=success.headers.getSetCookie().find(value=>value.startsWith('argo_session='));
 const user=await session.sessionUser(signedCookie.split(';')[0]);
 equal(user.userId,'google:1234');equal(user.email,'user@example.test');
@@ -56,4 +57,5 @@ equal(signout.headers.get('location'),origin+'/');equal(signout.headers.getSetCo
 globalThis.authTestEnv.GOOGLE_CLIENT_ID='';
 equal(new URL((await start(new Request(origin+'/auth/google'))).headers.get('location')).searchParams.get('error'),'configuration');
 globalThis.fetch=originalFetch;
+globalThis.authTestEnv.DB.close();
 console.log(`${checks} Google OAuth checks passed (mock Google responses): PKCE, state, signed session, logout and origin checks.`);

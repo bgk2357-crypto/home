@@ -5,3 +5,5 @@ AUTH_SECRET=""
 APP_ORIGIN="http://localhost:5173"
 # Optional: NAVER Cloud Maps application key ID. Enable Dynamic Map and Geocoding.
 NAVER_MAP_CLIENT_ID=""
+
+MASTER_EMAIL="bgk2357@gmail.com"

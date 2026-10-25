@@ -1,3 +1,4 @@
+import { ensureMember } from "../../../member-store";
 import { setting } from "../../../runtime-config";
 import { cookie, cookieValue, FLOW_COOKIE, readValue, safeReturnPath, SESSION_COOKIE, SESSION_SECONDS, signValue } from "../../session";
 
@@ -20,9 +21,10 @@ export async function GET(request: Request) {
     if (!profileResponse.ok) return failure("failed");
     const profile = await profileResponse.json() as { sub?: string; email?: string; email_verified?: boolean; name?: string };
     if (!profile.sub || !profile.email || profile.email_verified !== true) return failure("failed");
+    const membership = await ensureMember({userId:`google:${profile.sub}`,email:profile.email,displayName:(profile.name||profile.email).slice(0,100),fullName:profile.name?.slice(0,100)??null});
     const session = await signValue({ type: "session", userId: `google:${profile.sub}`, email: profile.email, displayName: (profile.name || profile.email).slice(0, 100), fullName: profile.name?.slice(0, 100) ?? null, exp: Math.floor(Date.now() / 1000) + SESSION_SECONDS });
     responseHeaders.append("Set-Cookie", cookie(SESSION_COOKIE, session, SESSION_SECONDS, origin));
-    responseHeaders.set("Location", new URL(safeReturnPath(typeof flow.returnTo === "string" ? flow.returnTo : null), origin).toString());
+    responseHeaders.set("Location", new URL(membership?.role==="preliminary"?"/members":safeReturnPath(typeof flow.returnTo === "string" ? flow.returnTo : null), origin).toString());
     return new Response(null, { status: 303, headers: responseHeaders });
   } catch { return failure("failed"); }
 }

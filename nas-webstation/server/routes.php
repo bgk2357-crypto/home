@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . "/resources.php";
 function oauth_identity($code, $verifier, $request = 'http_json') {
     $c = config(); $redirect = $c['app_origin'] . route_url('/auth/google/callback');
     $token = $request('https://oauth2.googleapis.com/token', ['client_id' => $c['google_client_id'], 'client_secret' => $c['google_client_secret'], 'code' => $code, 'grant_type' => 'authorization_code', 'redirect_uri' => $redirect, 'code_verifier' => $verifier]);
@@ -21,10 +22,10 @@ function oauth_callback() {
     if (request_origin() !== config()['app_origin'] || !$flow || ($flow['type'] ?? '') !== 'oauth' || !is_string($flow['state'] ?? null) || !is_string($_GET['state'] ?? null) || !hash_equals($flow['state'], $_GET['state']) || !is_string($flow['verifier'] ?? null) || !is_string($_GET['code'] ?? null) || $_GET['code'] === '' || isset($_GET['error'])) redirect_to('/login?error=cancelled');
     try { $identity = oauth_identity($_GET['code'], $flow['verifier']); }
     catch (Throwable $error) { error_log('[argo] Google authentication failed'); redirect_to('/login?error=failed'); }
-    set_cookie('argo_session', sign_value($identity), 604800); redirect_to(safe_path($flow['returnTo'] ?? '/'));
+    $registered=member($identity);set_cookie('argo_session', sign_value($identity), 604800); redirect_to(($registered['role']??'preliminary')==='preliminary'?'/members':safe_path($flow['returnTo'] ?? '/'));
 }
 function page_context() {
-    $identity = user(); $registered = member($identity); $page = page_number($_GET['page'] ?? '1');
+    $identity = user(); $registered = member($identity); if($identity)$identity['role']=$registered['role']??'preliminary'; $page = page_number($_GET['page'] ?? '1');
     $path = is_string($_GET['path'] ?? null) ? $_GET['path'] : '/';
     $empty = ['items' => [], 'total' => 0, 'pages' => 1, 'current' => 1];
     $entries = $path === '/guestbook' ? list_page('guestbook', $page) : $empty;
@@ -33,7 +34,7 @@ function page_context() {
     if ($path === '/community' && is_scalar($id) && ctype_digit((string)$id) && (int)$id > 0) {
         $query = db()->prepare("SELECT id,kind,user_id AS userId,author,title,body,created_at AS createdAt FROM posts WHERE kind='community' AND id=?"); $query->execute([(int)$id]); $selected = $query->fetch() ?: null;
     }
-    json_response(['user' => $identity, 'member' => $registered, 'entries' => $entries, 'posts' => $posts, 'selected' => $selected, 'googleReady' => google_ready(), 'mapKey' => config()['naver_map_client_id'] ?? '', 'csrf' => csrf_token()]);
+    json_response(['user' => $identity, 'member' => $registered, 'entries' => $entries, 'posts' => $posts, 'selected' => $selected, 'googleReady' => google_ready(), 'mapKey' => config()['naver_map_client_id'] ?? '', 'resources' => $path === '/resources/safety-forms' ? resource_list($page, $_GET['q'] ?? '', $_GET['category'] ?? '') : resource_empty(), 'resourceSelected' => $path === '/resources/safety-forms' ? resource_get($_GET['post'] ?? '') : null, 'paidRequests' => $identity ? member_requests($identity['userId']) : [], 'adminData' => $path === '/admin/members' && member_master($registered) ? member_admin($page,$_GET['q']??'',$_GET['role']??'') : null, 'csrf' => csrf_token()]);
 }
 function action($action) {
     if (!in_array($action, ['guestbook', 'join', 'qna', 'community'], true)) json_response(['error' => 'not-found'], 404);
@@ -43,10 +44,10 @@ function action($action) {
     // Accept only the exact configured public origin or the direct request origin;
     // never use client-supplied forwarding headers as an additional allowlist.
     if ($origin !== '' && $origin !== (config()['app_origin'] ?? '') && $origin !== request_origin()) json_response(['error' => 'different-origin'], 403);
-    $identity = in_array($action, ['guestbook', 'community'], true) ? null : user();
-    if (!in_array($action, ['guestbook', 'community'], true) && !$identity) json_response(['error' => 'authentication-required'], 401);
-    $registered = $action === 'qna' ? member($identity) : null;
-    if ($action === 'qna' && !$registered) json_response(['error' => 'membership-required'], 403);
+    $identity = in_array($action, ['guestbook'], true) ? null : user();
+    if (!in_array($action, ['guestbook'], true) && !$identity) json_response(['error' => 'authentication-required'], 401);
+    $registered = in_array($action,['qna','community'],true) ? member($identity) : null;
+    if (in_array($action,['qna','community'],true) && !member_can_write($registered)) json_response(['error' => 'membership-required'], 403);
     $path = '/' . $action;
     if (strtolower(trim(explode(';', $_SERVER['CONTENT_TYPE'] ?? '')[0])) !== 'application/x-www-form-urlencoded') redirect_to($path . '?error=invalid');
     if ((int)($_SERVER['CONTENT_LENGTH'] ?? 0) > 32768) redirect_to($path . '?error=invalid');
@@ -67,8 +68,8 @@ function action($action) {
         $title = field($form, 'title', 100); $body = field($form, 'body', 2000);
         if ($title === null || $body === null) redirect_to($path . '?error=invalid');
         if ($action === 'community') {
-            $author = field($form, 'author', 30); if ($author === null) redirect_to($path . '?error=invalid');
-            $query = $db->prepare("INSERT INTO posts (kind,user_id,author,title,body,created_at) SELECT 'community',?,?,?,?,? WHERE (SELECT COUNT(*) FROM posts WHERE kind='community')<10000"); $query->execute(['guest:' . bin2hex(random_bytes(16)), $author, $title, $body, $now]);
+            $author = $registered['displayName']; if ($author === null) redirect_to($path . '?error=invalid');
+            $query = $db->prepare("INSERT INTO posts (kind,user_id,author,title,body,created_at) SELECT 'community',?,?,?,?,? WHERE (SELECT COUNT(*) FROM posts WHERE kind='community')<10000"); $query->execute([$identity['userId'], $author, $title, $body, $now]);
         } else {
             $query = $db->prepare("INSERT INTO posts (kind,user_id,author,title,body,created_at) SELECT 'qna',?,?,?,?,? WHERE (SELECT COUNT(*) FROM posts WHERE user_id=?)<1000"); $query->execute([$identity['userId'], $registered['displayName'], $title, $body, $now, $identity['userId']]);
         }
@@ -79,8 +80,11 @@ function dispatch() {
     header('X-Content-Type-Options: nosniff'); header('Referrer-Policy: strict-origin-when-cross-origin'); header('Cache-Control: no-store');
     config();
     $route = $_GET['route'] ?? '/'; if (!is_string($route) || !preg_match('#^/[a-zA-Z0-9/_-]*$#D', $route)) json_response(['error' => 'invalid-route'], 400);
+    if (in_array($route,['/actions/join','/actions/member-profile','/actions/paid-request','/actions/paid-cancel','/actions/admin-grade','/actions/admin-paid-review','/actions/qna-answer'],true)) member_action(substr($route,9));
+    if ($route === '/actions/safety-resources') resource_upload();
     if (strpos($route, '/actions/') === 0) action(substr($route, 9));
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'GET') { header('Allow: GET'); json_response(['error' => 'method-not-allowed'], 405); }
+    if ($route === '/api/safety-files') resource_download();
     if ($route === '/api/page') page_context();
     if ($route === '/api/health') {
         $checks = ['connection' => false, 'guestbook' => false, 'community' => false];
