@@ -39,7 +39,10 @@ function action($action) {
     if (!in_array($action, ['guestbook', 'join', 'qna', 'community'], true)) json_response(['error' => 'not-found'], 404);
     if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST') { header('Allow: POST'); json_response(['error' => 'method-not-allowed'], 405); }
     $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-    if ($origin !== '' && $origin !== request_origin()) json_response(['error' => 'different-origin'], 403);
+    // TLS may terminate at the NAS proxy, leaving an HTTP/loopback origin here.
+    // Accept only the exact configured public origin or the direct request origin;
+    // never use client-supplied forwarding headers as an additional allowlist.
+    if ($origin !== '' && $origin !== (config()['app_origin'] ?? '') && $origin !== request_origin()) json_response(['error' => 'different-origin'], 403);
     $identity = in_array($action, ['guestbook', 'community'], true) ? null : user();
     if (!in_array($action, ['guestbook', 'community'], true) && !$identity) json_response(['error' => 'authentication-required'], 401);
     $registered = $action === 'qna' ? member($identity) : null;

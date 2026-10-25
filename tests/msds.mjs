@@ -8,11 +8,12 @@ import CFB from 'cfb';
 import { deflateSync } from 'fflate';
 globalThis.DOMParser=DOMParser;
 await mkdir('.sites-runtime/tests',{recursive:true});
-for(const [name,entry]of [['core','lib/msds.ts'],['files','lib/msds-files.ts'],['export','lib/msds-export.ts'],['print','lib/msds-print.ts']])await build({entryPoints:[entry],outfile:'.sites-runtime/tests/msds-'+name+'.mjs',bundle:true,platform:'node',format:'esm',packages:'external'});
+for(const [name,entry]of [['core','lib/msds.ts'],['files','lib/msds-files.ts'],['export','lib/msds-export.ts'],['print','lib/msds-print.ts'],['selection','lib/msds-file-selection.ts']])await build({entryPoints:[entry],outfile:'.sites-runtime/tests/msds-'+name+'.mjs',bundle:true,platform:'node',format:'esm',packages:'external'});
 const {analyseMsds,labelProblems}=await import('../.sites-runtime/tests/msds-core.mjs');
 const {extractMsdsFile}=await import('../.sites-runtime/tests/msds-files.mjs');
-const {msdsWorkbook,msdsHwpx}=await import('../.sites-runtime/tests/msds-export.mjs');
+const {msdsWorkbook,msdsHwpx,msdsRtf}=await import('../.sites-runtime/tests/msds-export.mjs');
 const {msdsPrintHtml}=await import('../.sites-runtime/tests/msds-print.mjs');
+const {takeMsdsFiles}=await import('../.sites-runtime/tests/msds-selection.mjs');
 const text=`1. 화학제품과 회사에 관한 정보
 제품명: 시험용 에탄올
 회사명: 테스트 공급자
@@ -45,6 +46,14 @@ const record=analyseMsds(text,'sample.txt');equal(record.product,'시험용 에�
 equal(labelProblems(record,100,90,'5',0).length,1);record.reviewed=true;equal(labelProblems(record,100,90,'5',0),[]);assert.ok(labelProblems(record,90,90,'5',0).some(s=>s.includes('90.0')));checks++;
 equal(analyseMsds('2. 유해성·위험성\nH225 고인화성 액체\n3. 구성성분\n64-17-5','no-image.txt').pictograms,[]);
 equal((await extractMsdsFile(new File([text],'test.txt'))).product,record.product);
+// Model a live native FileList: clearing the input invalidates its entries.
+const sourceFiles=[new File([text],'picker-test.txt'),new File([text],'picker-second.txt')];
+const liveFiles={get length(){return sourceFiles.length;},item(index){return sourceFiles[index]??null;},*[Symbol.iterator](){yield* sourceFiles;}};
+const picker={files:liveFiles,get value(){return 'selected';},set value(value){assert.equal(value,'');sourceFiles.length=0;}};
+const selection=takeMsdsFiles(picker);equal(liveFiles.length,0);equal(selection.length,2);
+await new Promise(resolve=>setTimeout(resolve,0));
+equal((await extractMsdsFile(selection[0])).product,record.product);equal((await extractMsdsFile(selection[1])).fileName,'picker-second.txt');
+equal(takeMsdsFiles(picker),[]);
 const pdfLines=['1. Identification','Product name: TEST ETHANOL','Company name: Test Supplier','Address: Test Address','Telephone: 000-0000','2. Hazards identification','Signal word: Danger','GHS02','H225 Highly flammable liquid and vapour','P210 Keep away from heat','3. Composition','Ethanol 64-17-5 95 percent'];
 const stream='BT /F1 12 Tf 16 TL 40 750 Td '+pdfLines.map((line,index)=>(index?'T* ':'')+'('+line+') Tj').join('\n')+' ET';
 const objects=['<< /Type /Catalog /Pages 2 0 R >>','<< /Type /Pages /Kids [3 0 R] /Count 1 >>','<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>','<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',`<< /Length ${Buffer.byteLength(stream)} >>\nstream\n${stream}\nendstream`];
@@ -54,9 +63,11 @@ const docx=new JSZip();docx.file('word/document.xml','<w:document xmlns:w="http:
 equal((await extractMsdsFile(new File([await docx.generateAsync({type:'uint8array'})],'sample.docx'))).cas,record.cas);
 const compound=CFB.utils.cfb_new();const header=Buffer.alloc(256);header.write('HWP Document File');header.writeUInt32LE(1,36);CFB.utils.cfb_add(compound,'FileHeader',header);const body=Buffer.from(text,'utf16le');const paragraph=Buffer.alloc(4+body.length);paragraph.writeUInt32LE((body.length<<20)|67,0);body.copy(paragraph,4);CFB.utils.cfb_add(compound,'BodyText/Section0',deflateSync(paragraph));
 equal((await extractMsdsFile(new File([CFB.write(compound,{type:'buffer'})],'sample.hwp'))).product,record.product);
-const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(await msdsWorkbook([record]));equal(workbook.worksheets.map(s=>s.name),['물질목록','취급·응급조치','추출원문']);equal(workbook.getWorksheet('물질목록').getCell('A2').value,record.product);equal(workbook.getWorksheet('물질목록').getCell('L2').value,'검토 완료');
-const template=await readFile('public/templates/blank.hwpx');const hwpx=await msdsHwpx(record,template.buffer.slice(template.byteOffset,template.byteOffset+template.byteLength));const zip=await JSZip.loadAsync(hwpx);equal(await zip.file('mimetype').async('string'),'application/hwp+zip');const xml=await zip.file('Contents/section0.xml').async('string');const document=new DOMParser().parseFromString(xml,'application/xml');equal(document.getElementsByTagName('parsererror').length,0);assert.ok(xml.includes(record.product));checks++;
+const images=Object.fromEntries(await Promise.all(['GHS02','GHS07'].map(async id=>[id,new Uint8Array(await readFile(`public/ghs/${id}.png`))])));
+const workbook=new ExcelJS.Workbook();await workbook.xlsx.load(await msdsWorkbook([record],{images}));equal(workbook.worksheets.map(s=>s.name),['물질목록','취급·응급조치','전체항목','MSDS16항','GHS그림문자','추출원문']);equal(workbook.getWorksheet('물질목록').getCell('A2').value,record.product);const summary=workbook.getWorksheet('물질목록');const reviewCol=summary.getRow(1).values.indexOf('원문 검토');equal(summary.getRow(2).getCell(reviewCol).value,'검토 완료');equal(workbook.getWorksheet('GHS그림문자').getImages().length,2);equal(workbook.getWorksheet('MSDS16항').rowCount,17);
+const template=await readFile('public/templates/blank.hwpx');const hwpx=await msdsHwpx(record,template.buffer.slice(template.byteOffset,template.byteOffset+template.byteLength),{images});const zip=await JSZip.loadAsync(hwpx);equal(await zip.file('mimetype').async('string'),'application/hwp+zip');const xml=await zip.file('Contents/section0.xml').async('string');const document=new DOMParser().parseFromString(xml,'application/xml');equal(document.getElementsByTagName('parsererror').length,0);assert.ok(xml.includes(record.product));checks++;equal(document.getElementsByTagNameNS('*','pic').length,2);equal(await zip.file('BinData/GHS02.png').async('uint8array'),images.GHS02);const localHeader=new DataView(hwpx.buffer,hwpx.byteOffset,hwpx.byteLength);equal(localHeader.getUint16(8,true),0);equal(new TextDecoder().decode(hwpx.slice(30,38)),'mimetype');
+const rtf=new TextDecoder().decode(await msdsRtf(record,{images}));assert.ok(rtf.startsWith('{\\rtf1'));assert.ok(rtf.includes('\\pngblip'));assert.ok(rtf.includes('\\u'));assert.ok(!/[^\x00-\x7f]/.test(rtf));checks+=4;
 equal((await extractMsdsFile(new File([hwpx],'editable.hwpx'))).product,record.product);
 const html=msdsPrintHtml({...record,product:'<script>alert(1)</script>'},'label',100,90,'https://test.local');assert.ok(html.includes('&lt;script&gt;alert(1)&lt;/script&gt;'));assert.ok(!html.includes('<h1><script>'));assert.ok(html.includes('100mm 90mm'));assert.ok(html.includes('/ghs/GHS02.svg'));assert.ok(html.includes('scrollHeight'));checks+=5;
 await assert.rejects(()=>extractMsdsFile(new File(['tiny'],'scan.txt')));checks++;
-console.log(`${checks} MSDS checks passed: evidence-only fields, missing pictograms, label area/review gates, TXT/DOCX/HWP/HWPX reads, XLSX/HWPX round trip, escaping and print dimensions.`);
+console.log(`${checks} MSDS checks passed: picker reset before async analysis, evidence-only fields, missing pictograms, label area/review gates, TXT/PDF/DOCX/HWP/HWPX reads, XLSX/HWPX round trip, escaping and print dimensions.`);

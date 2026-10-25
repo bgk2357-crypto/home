@@ -80,5 +80,19 @@ try {
   eq((await fetch(origin + '/index.php?route[]=bad')).status, 400);
   eq((await fetch(route('/auth/google'), { method: 'POST' })).status, 405);
   await stop(); await launch(); eq((await page('/guestbook')).entries.total, 1); eq((await page('/community')).posts.total, 1); eq((await page('/qna', 'A')).posts.total, 1);
+  // Reproduce Synology TLS termination without forwarding headers: browser uses
+  // the configured HTTPS hostname while PHP receives HTTP on a loopback host.
+  await stop();
+  const publicOrigin = 'https://homepage.example.test';
+  await writeFile(configPath, `<?php return json_decode(base64_decode('${Buffer.from(JSON.stringify({ ...configuration, app_origin: publicOrigin })).toString('base64')}'), true);`);
+  await launch();
+  eq((await post('guestbook', { author: 'Proxy visitor', body: 'HTTPS guestbook' }, null, { Origin: publicOrigin })).status, 303);
+  eq((await post('community', { author: 'Proxy visitor', title: 'HTTPS community', body: 'Saved through proxy' }, null, { Origin: publicOrigin })).status, 303);
+  eq((await page('/guestbook')).entries.total, 2);
+  eq((await page('/community')).posts.total, 2);
+  eq((await post('guestbook', { author: 'a', body: 'b', _csrf: 'wrong' }, null, { Origin: publicOrigin })).status, 403);
+  for (const hostile of ['https://evil.test', publicOrigin + '.evil.test', 'null', 'http://homepage.example.test']) {
+    eq((await post('guestbook', { author: 'a', body: 'b' }, null, { Origin: hostile, 'X-Forwarded-Host': hostile.replace(/^https?:\/\//, ''), 'X-Forwarded-Proto': 'https' })).status, 403);
+  }
   console.log(`${checks} PHP HTTP checks passed: database migrations/persistence, public boards, CSRF/validation, membership, private Q&A isolation, signed/expired sessions, OAuth redirects, news and assets.`);
 } finally { await stop(); }
