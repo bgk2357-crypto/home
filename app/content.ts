@@ -1,10 +1,10 @@
 export const company = { name: "Argo&Health Lab", representative: "김지훈", address: "경기도 안산시 상록구 팔곡일동", phone: "010-7651-9208" };
 export const navigation = [
-  { label: "회사소개", href: "/company/greeting", children: [["인사말", "/company/greeting"], ["비전", "/company/vision"], ["연혁", "/company/history"], ["조직도", "/company/organization"], ["찾아오는길", "/company/location"]] },
-  { label: "사업범위 소개", href: "/business/achievements", children: [["주요실적", "/business/achievements"], ["안전보건관리체계 구축", "/business/system"], ["위험성평가", "/business/risk"], ["근골격계부담작업 유해요인조사", "/business/ergonomics"]] },
+  { label: "회사소개", href: "/company/greeting", children: [["인사말", "/company/greeting"], ["비전", "/company/vision"], ["연혁", "/company/history"], ["주요실적", "/company/achievements"], ["조직도", "/company/organization"], ["찾아오는길", "/company/location"]] },
+  { label: "사업범위 소개", href: "/business/system", children: [ ["안전보건관리체계 구축", "/business/system"], ["위험성평가", "/business/risk"], ["근골격계부담작업 유해요인조사", "/business/ergonomics"]] },
   { label: "산업보건소식", href: "/news/notices", children: [["공지사항", "/news/notices"], ["산업보건동향", "/news/trends"], ["일반뉴스", "/news/general"], ["산업재해 통계 현황", "/news/statistics"]] },
   { label: "자료실", href: "/resources/osh-law", children: [["산업안전보건법규", "/resources/osh-law"], ["중대재해처벌법규", "/resources/serious-law"], ["안전보건기술지침", "/resources/guidelines"], ["물질안전보건자료", "/resources/msds"], ["안전보건 자료 및 서식", "/resources/safety-forms"]] },
-  { label: "회원 전용 서비스", href: "/members", children: [] }, { label: "커뮤니티", href: "/community", children: [] }, { label: "Q&A", href: "/qna", children: [] }, { label: "방명록", href: "/guestbook", children: [] },
+  { label: "회원 전용 서비스", href: "/services", children: [] }, { label: "커뮤니티", href: "/community", children: [] }, { label: "Q&A", href: "/qna", children: [] }, { label: "방명록", href: "/guestbook", children: [] },
 ];
 export const services = [
   { number: "01", title: "안전보건관리체계 구축", href: "/business/system", description: "사업장의 안전보건 활동을 지속 가능한 관리체계로 연결합니다.", points: ["사업장 운영 현황 확인", "안전보건 목표와 실행 절차 정리", "역할·책임 및 점검 체계 검토"] },

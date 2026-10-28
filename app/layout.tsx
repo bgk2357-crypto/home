@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import "./safety.css";
 import "./membership.css";
+import "./workspace.css";
 
 export const metadata: Metadata = {
   title: { default: "Argo&Health Lab | 안전과 건강을 잇는 파트너", template: "%s | Argo&Health Lab" },

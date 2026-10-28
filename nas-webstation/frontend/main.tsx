@@ -8,6 +8,7 @@ import { context, routeUrl, setContext } from './context';
 import '../../app/globals.css';
 import '../../app/safety.css';
 import '../../app/membership.css';
+import "../../app/workspace.css";
 
 // Query routing runs on both Apache and nginx without rewrite modules.
 // Translate internal navigation and forms while retaining normal browser history,
@@ -32,6 +33,7 @@ observer.observe(document.documentElement, { childList: true, subtree: true, att
 const nativeFetch = window.fetch.bind(window);
 window.fetch = (input, init) => nativeFetch(typeof input === 'string' && input.startsWith('/api/') ? routeUrl(input) : input, init);
 
+document.documentElement.dataset.argoRuntime='php';
 async function start() {
   const params = new URLSearchParams(location.search);
   const path = params.get('route') || (location.pathname === '/index.php' ? '/' : location.pathname);

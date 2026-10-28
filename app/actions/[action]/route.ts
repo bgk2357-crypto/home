@@ -1,3 +1,5 @@
+import {cookie,cookieValue,sessionUser} from '../../auth/session';
+import {tokenHash} from '../../account-recovery';
 import { memberAction } from "../../member-actions";
 import { canWrite } from "../../../lib/membership";
 import { uploadResource } from "../../resource-actions";
@@ -27,7 +29,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
   const origin = request.headers.get("origin");
   if (origin && origin !== new URL(request.url).origin) return new Response("다른 사이트에서의 제출은 허용하지 않습니다.", { status: 403 });
   const publicWrite = action === "guestbook";
-  const user = publicWrite ? null : await getUser();
+  const user = publicWrite ? null : await sessionUser(request.headers.get('cookie')||'');
   if (!publicWrite && !user) return new Response("로그인 후 이용해주세요.", { status: 401, headers: { "Cache-Control": "no-store" } });
   const member = ["qna","community"].includes(action) ? await getMember(user!.userId) : null;
   if (["qna","community"].includes(action) && !canWrite(member)) return new Response("홈페이지 회원가입 후 작성할 수 있습니다.", { status: 403 });
@@ -45,8 +47,9 @@ export async function POST(request: Request, { params }: { params: Promise<{ act
     if (action === "guestbook") {
       const author = field(form, "author", 30); const body = field(form, "body", 500);
       if (!author || !body) return go(request, "/guestbook?error=invalid");
-      const result = await db.prepare("INSERT INTO guestbook (author, body, created_at) SELECT ?, ?, ? WHERE (SELECT COUNT(*) FROM guestbook) < 2000").bind(author, body, now).run();
-      return go(request, result.meta.changes ? "/guestbook?saved=1" : "/guestbook?error=capacity");
+      const owner=cookieValue(request.headers.get('cookie')||'','argo_guest_owner')||crypto.randomUUID()+crypto.randomUUID();
+      const result = await db.prepare("INSERT INTO guestbook (author, body, created_at,user_id,owner_hash) SELECT ?, ?, ?,?,? WHERE (SELECT COUNT(*) FROM guestbook) < 2000").bind(author, body, now,(await sessionUser(request.headers.get('cookie')||''))?.userId||null,await tokenHash(owner)).run();
+      return new Response(null,{status:303,headers:{Location:new URL(result.meta.changes?"/guestbook?saved=1":"/guestbook?error=capacity",request.url).toString(),"Set-Cookie":cookie("argo_guest_owner",owner,31536000,new URL(request.url).origin)}});
     }
     const title = field(form, "title", 100); const body = field(form, "body", 2000);
     if (!title || !body) return go(request, `${path}?error=invalid`);

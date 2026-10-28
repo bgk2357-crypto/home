@@ -7,7 +7,7 @@ export function ownerEmail(){return (setting("MASTER_EMAIL")||"bgk2357@gmail.com
 export async function ensureMember(identity:User){
  const db=env.DB;if(!db)throw Error("Database unavailable");const now=new Date().toISOString();const email=identity.email.toLowerCase();
  await db.prepare("INSERT INTO members(user_id,display_name,created_at,email,role,updated_at) VALUES(?,?,?,?,'preliminary',?) ON CONFLICT(user_id) DO UPDATE SET email=excluded.email").bind(identity.userId,identity.displayName.slice(0,30)||"회원",now,email,now).run();
- if(email===ownerEmail()){
+ if(email===ownerEmail()&&identity.userId.startsWith('google:')&&identity.authMethod!=='password'){
   const result=await db.prepare("UPDATE members SET role='master',version=version+1,updated_at=? WHERE user_id=? AND role!='master'").bind(now,identity.userId).run();
   if(result.meta.changes)await db.prepare("INSERT INTO member_audit(operation_id,actor_id,target_id,action,old_role,new_role,reason,created_at) VALUES(?,?,?,'bootstrap_master','','master','소유자가 지정한 Google 인증 계정',?)").bind(crypto.randomUUID(),identity.userId,identity.userId,now).run();
  }

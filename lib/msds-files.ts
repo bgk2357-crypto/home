@@ -1,3 +1,4 @@
+import {extractProductMatrix} from './msds-matrix';
 import { analyseMsds } from "./msds";
 import { pdfPageText, xmlDocumentText } from "./msds-layout";
 
@@ -5,6 +6,7 @@ const MAX_UNPACKED = 16 * 1024 * 1024;
 export async function extractMsdsFile(file: File, options: { pdfWorkerSrc?: string } = {}) {
   if (file.size > 10 * 1024 * 1024) throw new Error("파일은 10MB 이하로 선택해주세요.");
   const extension = file.name.split(".").pop()?.toLowerCase(); const buffer = await file.arrayBuffer(); let text = "";
+  const matrixPages:unknown[][]=[];
   const evidence: Record<string, string> = {}; const notes: string[] = []; let unidentified = 0;
   async function inspectImage(bytes: Uint8Array, source: string) { try { const { imagePictograms } = await import("./msds-pictograms"); for (const match of await imagePictograms(bytes)) { if (match.id) evidence[match.id] = source; else unidentified++; } } catch { /* A non-image attachment must not prevent text extraction. */ } }
   if (extension === "pdf") {
@@ -16,7 +18,7 @@ export async function extractMsdsFile(file: File, options: { pdfWorkerSrc?: stri
       if (pdf.numPages > 80) throw new Error("80페이지 이하의 MSDS를 선택해주세요.");
       for (let number = 1; number <= pdf.numPages; number++) {
         const page = await pdf.getPage(number); const content = await page.getTextContent();
-        const pageText = pdfPageText(content.items); text += pageText + "\n";
+        matrixPages.push(content.items); const pageText = pdfPageText(content.items); text += pageText + "\n";
         if (typeof document !== "undefined" && (number <= 5 || /(?:^|\n)\s*2[.)．]\s*유해/.test(pageText))) {
           try { const viewport = page.getViewport({ scale: 1.25 }); const canvas = document.createElement("canvas"); canvas.width = Math.ceil(viewport.width); canvas.height = Math.ceil(viewport.height); const context = canvas.getContext("2d", { willReadFrequently: true });
             if (context && canvas.width * canvas.height <= 8000000) { await page.render({ canvasContext: context, canvas, viewport }).promise; const { recognisePictograms } = await import("./msds-pictograms"); for (const match of recognisePictograms(context.getImageData(0, 0, canvas.width, canvas.height))) { if (match.id) evidence[match.id] = `원본 PDF ${number}쪽 그림`; else unidentified++; } }
@@ -80,5 +82,5 @@ export async function extractMsdsFile(file: File, options: { pdfWorkerSrc?: stri
   record.pictograms = [...new Set([...record.pictograms, ...Object.keys(evidence)])].sort(); record.pictogramEvidence = { ...record.pictogramEvidence, ...evidence };
   if (unidentified) notes.push(`그림문자 후보 ${unidentified}개는 표준 그림과 확실하게 일치하지 않아 자동 선택하지 않았습니다. 원문과 대조해 직접 선택해주세요.`);
   record.extractionNotes = [...(record.extractionNotes ?? []), ...notes];
-  return record;
+  return Object.assign(record,{matrixProducts:extractProductMatrix(matrixPages)});
 }

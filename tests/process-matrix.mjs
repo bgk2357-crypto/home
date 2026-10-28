@@ -1,0 +1,2 @@
+import {build} from 'vite';import {pathToFileURL} from 'node:url';import path from 'node:path';
+await build({configFile:false,publicDir:false,logLevel:'error',build:{ssr:path.resolve('tests/process-matrix.ts'),outDir:'.sites-runtime/tests/process-matrix',emptyOutDir:true,rollupOptions:{output:{entryFileNames:'check.mjs'}}}});await import(pathToFileURL(path.resolve('.sites-runtime/tests/process-matrix/check.mjs')).href);

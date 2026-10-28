@@ -7,3 +7,8 @@ APP_ORIGIN="http://localhost:5173"
 NAVER_MAP_CLIENT_ID=""
 
 MASTER_EMAIL="bgk2357@gmail.com"
+# Email/password recovery (Node/Worker): verified sender + Resend-compatible HTTPS JSON API.
+# Recipients always come from the registered account email. Keep keys private.
+MAIL_FROM=""
+MAIL_API_URL="https://api.resend.com/emails"
+MAIL_API_KEY=""

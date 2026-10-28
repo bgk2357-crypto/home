@@ -139,9 +139,11 @@ NAS의 실제 PHP 설정, OAuth 키, 인증서, 공유기 포워딩과 외부 �
 
 소스에서 재빌드 (PC에서)
 npm ci
-npm run build:webstation
-생성 파일: outputs/synology-webstation.zip
+node scripts/build-webstation.mjs --revision N
+N은 사용자 요청에 배정한 차수이며, 미완료 요청의 내부 재빌드에는 --update-same-request를 추가합니다.
+생성 파일: outputs/YYYY-MM-DD/ZIP/YYYY-MM-DD_NNN차수정_HOME_NAS배포본.zip
 실제 NAS에는 ZIP 안의 결과물만 업로드합니다. Node.js는 NAS에 필요하지 않습니다.
+이메일 복구·커뮤니티·탈퇴·글 삭제 업데이트는 ACCOUNT-COMMUNITY-UPDATE.txt를 함께 확인하세요.
 
 회원등급 업데이트 (2026-10-25)
 Google 간편가입은 예비회원, 필수 사업장 정보 완료 후 일반회원, 입금·결제 확인 후 마스터 승인 시 정회원입니다.

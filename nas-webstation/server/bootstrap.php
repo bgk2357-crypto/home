@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . "/membership.php";
+require_once __DIR__ . "/credentials.php";
 // PHP 7.4+; no Composer, Node.js or Docker needed on the NAS.
 function config() {
     static $config;
@@ -61,8 +62,10 @@ function set_cookie($name, $value, $seconds) {
 }
 function user() {
     $value = read_value($_COOKIE['argo_session'] ?? null);
-    if (!$value || ($value['type'] ?? '') !== 'session' || !is_string($value['userId'] ?? null) || strpos($value['userId'], 'google:') !== 0 || !is_string($value['email'] ?? null) || !is_string($value['displayName'] ?? null)) return null;
-    return ['userId' => $value['userId'], 'email' => $value['email'], 'displayName' => $value['displayName'], 'fullName' => $value['fullName'] ?? null];
+    if (!$value || ($value['type'] ?? '') !== 'session' || !is_string($value['userId'] ?? null) || (strpos($value['userId'], 'google:') !== 0&&strpos($value['userId'],'local:')!==0) || !is_string($value['email'] ?? null) || !is_string($value['displayName'] ?? null)) return null;
+    $check=db()->prepare('SELECT deleted_at FROM members WHERE user_id=?');$check->execute([$value['userId']]);$existing=$check->fetch();if(!empty($existing['deleted_at']))return null;
+    if(($value['authMethod']??'')==='password'){$q=db()->prepare('SELECT session_version FROM auth_credentials WHERE user_id=?');$q->execute([$value['userId']]);$account=$q->fetch();if(!$account||(int)$account['session_version']!==($value['sessionVersion']??0))return null;}
+    return ['userId' => $value['userId'], 'email' => $value['email'], 'displayName' => $value['displayName'], 'fullName' => $value['fullName'] ?? null,'authMethod'=>($value['authMethod']??'google'),'authenticatedAt'=>$value['authenticatedAt']??null];
 }
 function csrf_token() {
     $token = $_COOKIE['argo_csrf'] ?? '';

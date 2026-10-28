@@ -3,8 +3,10 @@ function member_owner_email(){return strtolower(trim(config()['master_email']??'
 function member_columns(){return 'user_id AS userId,display_name AS displayName,created_at AS createdAt,email,role,business_name AS businessName,business_size AS businessSize,contact_name AS contactName,job_title AS jobTitle,phone,profile_completed_at AS profileCompletedAt,updated_at AS updatedAt,version';}
 function member_ensure($identity){
     $db=db();$email=strtolower($identity['email']);$now=now_iso();
-    $q=$db->prepare("INSERT INTO members(user_id,display_name,created_at,email,role,updated_at) VALUES(?,?,?,?,'preliminary',?) ON CONFLICT(user_id) DO UPDATE SET email=excluded.email");$q->execute([$identity['userId'],mb_substr($identity['displayName'],0,30,'UTF-8')?:'회원',$now,$email,$now]);
-    if($email===member_owner_email()){
+    $q=$db->prepare("INSERT OR IGNORE INTO members(user_id,display_name,created_at,email,role,updated_at) VALUES(?,?,?,?,'preliminary',?)");$q->execute([$identity['userId'],mb_substr($identity['displayName'],0,30,'UTF-8')?:'회원',$now,$email,$now]);
+    // SQLite 3.10 compatibility: preserve existing profile and grade; refresh verified email only.
+    $q=$db->prepare('UPDATE members SET email=? WHERE user_id=?');$q->execute([$email,$identity['userId']]);
+    if($email===member_owner_email()&&strpos($identity['userId'],'google:')===0&&($identity['authMethod']??'google')!=='password'){
         $db->beginTransaction();try{
             $q=$db->prepare("UPDATE members SET role='master',updated_at=?,version=version+1 WHERE user_id=? AND role!='master'");$q->execute([$now,$identity['userId']]);
             if($q->rowCount())$db->prepare("INSERT INTO member_audit(operation_id,actor_id,target_id,action,old_role,new_role,reason,created_at) VALUES(?,?,?,'bootstrap_master','','master','소유자가 지정한 Google 인증 계정',?)")->execute([bin2hex(random_bytes(16)),$identity['userId'],$identity['userId'],$now]);

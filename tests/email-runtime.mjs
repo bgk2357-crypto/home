@@ -1,0 +1,3 @@
+import {build} from 'vite';import path from 'node:path';import {pathToFileURL} from 'node:url';
+await build({configFile:false,publicDir:false,logLevel:'error',plugins:[{name:'email-env',resolveId(id){if(id==='cloudflare:workers')return '\0email-env';},load(id){if(id==='\0email-env')return 'export const env=new Proxy({}, {get(_t,k){return globalThis.safetyEnv?.[k]}});';}}],build:{ssr:path.resolve('tests/email-runtime.ts'),outDir:'.sites-runtime/tests/email-runtime',emptyOutDir:true,rollupOptions:{output:{entryFileNames:'check.mjs'}}}});
+await import(pathToFileURL(path.resolve('.sites-runtime/tests/email-runtime/check.mjs')).href);

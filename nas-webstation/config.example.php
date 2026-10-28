@@ -9,5 +9,10 @@ return [
     'google_client_secret' => '',
     'naver_map_client_id' => '',
     'master_email' => 'bgk2357@gmail.com', // 최초 소유자 마스터 Google 계정
+    // Password reset: recipient is the member's registered email. Set a verified sender privately.
+    'mail_transport' => '', // 'mail' for configured NAS PHP mail(), or 'api' (Resend-compatible JSON)
+    'mail_from' => '',
+    'mail_api_url' => 'https://api.resend.com/emails',
+    'mail_api_key' => '', // Private config.php only; never share or put in public/.
     'trusted_proxy_ips' => ['127.0.0.1', '::1'],
 ];

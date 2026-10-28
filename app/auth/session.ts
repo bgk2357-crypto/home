@@ -1,6 +1,7 @@
 import { setting } from "../runtime-config";
+import {env} from 'cloudflare:workers';
 
-export type User = { userId: string; displayName: string; email: string; fullName: string | null };
+export type User = { userId: string; displayName: string; email: string; fullName: string | null;authMethod?:'google'|'password';authenticatedAt?:number };
 export const SESSION_COOKIE = "argo_session";
 export const FLOW_COOKIE = "argo_google_flow";
 export const SESSION_SECONDS = 60 * 60 * 24 * 7;
@@ -36,8 +37,12 @@ export function cookie(name: string, value: string, seconds: number, origin: str
 }
 export async function sessionUser(header: string): Promise<User | null> {
   const data = await readValue(cookieValue(header, SESSION_COOKIE));
-  if (!data || data.type !== "session" || typeof data.userId !== "string" || !data.userId.startsWith("google:") || typeof data.email !== "string" || typeof data.displayName !== "string") return null;
-  return { userId: data.userId, email: data.email, displayName: data.displayName, fullName: typeof data.fullName === "string" ? data.fullName : null };
+  if (!data || data.type !== "session" || typeof data.userId !== "string" || !(data.userId.startsWith("google:")||data.userId.startsWith('local:')) || typeof data.email !== "string" || typeof data.displayName !== "string") return null;
+  if(env.DB){
+   const member=await env.DB.prepare('SELECT deleted_at FROM members WHERE user_id=?').bind(data.userId).first<{deleted_at:string|null}>();if(member?.deleted_at)return null;
+   if(data.authMethod==='password'){const account=await env.DB.prepare('SELECT session_version FROM auth_credentials WHERE user_id=?').bind(data.userId).first<{session_version:number}>();if(!account||account.session_version!==(data.sessionVersion??0))return null;}
+  }
+  return { userId: data.userId, email: data.email, displayName: data.displayName, fullName: typeof data.fullName === "string" ? data.fullName : null,authMethod:data.authMethod==='password'?'password':'google',authenticatedAt:typeof data.authenticatedAt==='number'?data.authenticatedAt:undefined };
 }
 export function safeReturnPath(value: string | null) {
   if (!value || !value.startsWith("/") || value.startsWith("//") || value.includes("\\")) return "/";

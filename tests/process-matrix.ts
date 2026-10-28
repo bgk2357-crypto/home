@@ -1,0 +1,41 @@
+import React from 'react';
+import {renderToStaticMarkup} from 'react-dom/server';
+import {ProcessSelect,ProcessSummary,UploadClassification,ClassificationDialog} from '../app/process-flow';
+import {extractMsdsFile} from '../lib/msds-files';
+import {extractComponents} from '../lib/msds-regulations';
+import assert from 'node:assert/strict';import fs from 'node:fs';
+import {extractProductMatrix,matrixIngredients} from '../lib/msds-matrix';import {cleanHierarchy,processAssignment,descendants} from '../lib/process-hierarchy';
+import {getDocument} from 'pdfjs-dist/legacy/build/pdf.mjs';
+const file='C:/Users/Playdata/Downloads/CSW-0001_MSDS_용접재료(연강용 피복아크 용접봉)_(국문)v7_2025.08.22.pdf';
+const loading=getDocument({data:new Uint8Array(fs.readFileSync(file)),useSystemFonts:true});const doc=await loading.promise;const pages:unknown[][]=[];for(let n=1;n<=doc.numPages;n++)pages.push((await(await doc.getPage(n)).getTextContent()).items);await loading.destroy();
+const parsed=await extractMsdsFile(new File([fs.readFileSync(file)],file.split('/').pop()!));assert.equal(parsed.matrixProducts.length,19);
+const matrix=extractProductMatrix(pages);assert.equal(matrix.length,19);for(const product of matrix)assert.equal(product.components.length,11,product.product);
+const row=(product:string,cas:string)=>matrix.find(p=>p.product===product)!.components.find(c=>c.cas===cas)!;
+assert.equal(row('CS-200','13463-67-7').concentration,'10.0~15.0');assert.equal(row('LT-25','13463-67-7').concentration,'5.0~10.0');assert.equal(row('CS-204','12001-26-2').concentration,'-');assert.equal(row('CS-200','12001-26-2').concentration,'1.0~5.0');assert.equal(row('CR-13V','7439-96-5').concentration,'-');assert.equal(row('CR-13V','12604-53-4').concentration,'1.0~5.0');assert.equal(row('LH-100','1317-65-3').concentration,'15.0~20.0');assert.equal(row('LH-100','7789-75-5').concentration,'5.0~10.0');assert.equal(row('CF-120Z','68476-25-5').concentration,'1.0~5.0');assert.equal(row('CS-22','12604-53-4').concentration,'5.0~10.0');assert.equal(row('CS-200','7439-89-6').concentration,'Rem.(나머지)');assert.equal(row('CS-200','13463-67-7').basis,'unknown');assert.ok(matrixIngredients(matrix[0]).includes('10.0~15.0'));assert.equal(extractProductMatrix([[]]).length,0);
+assert.equal(extractComponents(matrixIngredients(matrix[0])).find(c=>c.cas==='7439-89-6')!.concentration,'Rem.(나머지)');assert.equal(extractComponents(matrixIngredients(matrix.find(p=>p.product==='CS-204')!)).find(c=>c.cas==='12001-26-2')!.concentration,'-');
+const nodes=[{id:'d',parentId:'',name:'생산부',level:1},{id:'p',parentId:'d',name:'용접공정',level:2},{id:'t',parentId:'p',name:'피복아크 용접',level:3}];const clean=cleanHierarchy(nodes)!;assert.equal(clean.length,3);assert.deepEqual(processAssignment(clean,'t'),{categoryId:'t',category:'생산부 / 용접공정 / 피복아크 용접',department:'생산부',processName:'용접공정',taskName:'피복아크 용접'});assert.deepEqual(descendants(clean,'d'),['d','p','t']);assert.equal(cleanHierarchy([...nodes,{...nodes[2],id:'duplicate'}]),null);assert.equal(cleanHierarchy([{...nodes[2],parentId:'missing'}]),null);assert.equal(cleanHierarchy([{...nodes[0],parentId:'t'}]),null);assert.equal(cleanHierarchy([{...nodes[0],name:' '}]),null);
+console.log('Actual 19-product PDF matrix, cross-page concentrations and hierarchy validation passed');
+fs.writeFileSync('work/process-matrix/extracted-products.json',JSON.stringify(matrix,null,2));
+
+const deepNodes=[...nodes,{id:'x',parentId:'t',name:'세부작업',level:4,workDetails:'재료 확인'},{id:'y',parentId:'x',name:'검사',level:5}];assert.equal(cleanHierarchy(deepNodes)?.length,5);assert.equal(processAssignment(cleanHierarchy(deepNodes)!,'y').taskName,'피복아크 용접 / 세부작업 / 검사');assert.equal(cleanHierarchy([{...nodes[0],workDetails:'a'.repeat(2001)}]),null);
+
+const one=cleanHierarchy([nodes[0]])!;const oneSelect=renderToStaticMarkup(React.createElement(ProcessSelect,{nodes:one,value:'d',showAllLevels:false,onChange:()=>{}}));assert.ok(oneSelect.includes('대분류'));assert.equal((oneSelect.match(/<select /g)||[]).length,1);assert.ok(!oneSelect.includes('미지정'));const onlyMiddle=renderToStaticMarkup(React.createElement(ProcessSummary,{item:{department:'',processName:'용접공정',taskName:'',category:''} as any}));assert.ok(onlyMiddle.includes('중분류'));assert.ok(!onlyMiddle.includes('대분류'));assert.ok(!onlyMiddle.includes('미지정'));
+
+const canonical=renderToStaticMarkup(React.createElement(ProcessSummary,{item:{categoryId:'t',category:'stale',department:'old'} as any,nodes:clean}));assert.ok(canonical.includes('용접공정'));assert.ok(!canonical.includes('stale'));const strip=renderToStaticMarkup(React.createElement(UploadClassification,{nodes:clean,value:'t',onChange:()=>{},disabled:false,action:React.createElement('button',{},'확인 · 분석 시작')}));assert.ok(strip.includes('wd-upload-analysis-action'));assert.ok(strip.includes('확인 · 분석 시작'));assert.ok(!strip.includes('업로드 그룹 이름'));const dialog=renderToStaticMarkup(React.createElement(ClassificationDialog,{item:{id:'a',product:'제품',categoryId:'t'} as any,nodes:clean,busy:false,onSave:async()=>undefined,onClose:()=>{}}));assert.ok(dialog.includes('분류 연결 저장'));
+
+const emptyLink=renderToStaticMarkup(React.createElement(ProcessSelect,{nodes:clean,value:'',showAllLevels:true,onChange:()=>{}}));assert.equal((emptyLink.match(/<select /g)||[]).length,4);for(const title of ['대분류','중분류','소분류','기타 추가 분류'])assert.ok(emptyLink.includes(title));assert.equal((emptyLink.match(/disabled=/g)||[]).length,3);
+const deepLink=renderToStaticMarkup(React.createElement(ProcessSelect,{nodes:cleanHierarchy(deepNodes)!,value:'y',showAllLevels:true,onChange:()=>{}}));assert.ok(deepLink.includes('기타 추가 분류 2'));assert.ok(deepLink.includes('value="y" selected=""'));assert.ok(deepLink.includes('value="x" selected=""'));
+
+const defaultSelect=renderToStaticMarkup(React.createElement(ProcessSelect,{nodes:clean,value:'',onChange:()=>{}}));assert.equal((defaultSelect.match(/<select /g)||[]).length,4);assert.ok(strip.includes('기타 추가 분류'));assert.equal((dialog.match(/<select /g)||[]).length,4);
+const alternate=cleanHierarchy([...deepNodes,{id:'d2',parentId:'',name:'다른 부서',level:1},{id:'p2',parentId:'d2',name:'다른 공정',level:2}])!;
+const changedBranch=renderToStaticMarkup(React.createElement(ProcessSelect,{nodes:alternate,value:'d2',onChange:()=>{}}));assert.ok(changedBranch.includes('다른 공정'));assert.ok(!changedBranch.includes('value="x"'));assert.equal(processAssignment(alternate,'d2').taskName,'');assert.equal(processAssignment(alternate,'y').category,'생산부 / 용접공정 / 피복아크 용접 / 세부작업 / 검사');
+console.log('Four-level classification selectors, branch changes and deep assignment passed');
+import {ProductSelectionList} from '../app/msds-product-selection';
+const sampleProducts=[{id:'one',product:'제품 A',reviewed:true,category:'부서 A',supplier:'공급자 A'},{id:'two',product:'제품 B',reviewed:false,category:'',supplier:''}] as any;
+let selectionResult:string[]=[];
+const selectionProps={items:sampleProducts,selected:['one'],onChange:(ids:string[])=>{selectionResult=ids;},busy:false,actions:()=>React.createElement('button',{},'내용 검토')};
+const selectionHtml=renderToStaticMarkup(React.createElement(ProductSelectionList,selectionProps));assert.ok(selectionHtml.includes('제품 A 선택'));assert.ok(selectionHtml.includes('제품 B 선택'));assert.ok(selectionHtml.includes('선택됨'));assert.equal((selectionHtml.match(/type="checkbox"/g)||[]).length,3);assert.equal((selectionHtml.match(/wd-output-card/g)||[]).length,2);
+function nativeInputs(node:any):any[]{if(!node||typeof node!=='object')return [];if(Array.isArray(node))return node.flatMap(nativeInputs);return [...(node.type==='input'?[node]:[]),...nativeInputs(node.props?.children)];}
+const selectionInputs=nativeInputs(ProductSelectionList(selectionProps));selectionInputs[2].props.onChange({target:{checked:true}});assert.deepEqual(selectionResult,['one','two']);selectionInputs[1].props.onChange({target:{checked:false}});assert.deepEqual(selectionResult,[]);selectionInputs[0].props.onChange({target:{checked:true}});assert.deepEqual(selectionResult,['one','two']);
+assert.ok(strip.indexOf('wd-upload-analysis-action')<strip.indexOf('wd-class-disable'));
+console.log('Product selection, select-all, deselection and upload toolbar order passed');

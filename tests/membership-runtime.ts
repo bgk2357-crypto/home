@@ -12,7 +12,7 @@ globalThis.safetyEnv={DB:openDatabase(':memory:'),AUTH_SECRET:'test-member-secre
 const db=globalThis.safetyEnv.DB;let checks=0;const eq=(a,b)=>{assert.deepEqual(a,b);checks++;};
 async function login(id,email=id+'@example.test') {globalThis.safetyHeaders=new Headers();if(id)globalThis.safetyHeaders.set('cookie','argo_session='+await signValue({type:'session',userId:'google:'+id,email,displayName:'Google '+id,exp:Date.now()/1000+3600}));return getUser();}
 async function act(action,values={},origin='https://site.test'){return memberAction(new Request('https://site.test/actions/'+action,{method:'POST',headers:origin?{Origin:origin}:{},body:new URLSearchParams(values)}),action);}
-async function write(kind,values){return postAction(new Request('https://site.test/actions/'+kind,{method:'POST',headers:{Origin:'https://site.test'},body:new URLSearchParams(values)}),{params:Promise.resolve({action:kind})});}
+async function write(kind,values){return postAction(new Request('https://site.test/actions/'+kind,{method:'POST',headers:{Origin:'https://site.test',cookie:globalThis.safetyHeaders.get('cookie')||''},body:new URLSearchParams(values)}),{params:Promise.resolve({action:kind})});}
 const profile={displayName:'담당자 A',businessName:'테스트 사업장',businessSize:'20~49인',contactName:'김담당',jobTitle:'안전담당 / 과장',phone:'010-1234-5678',consent:'yes'};
 const redirect=(r,key)=>{assert.match(r.headers.get('location')||'',new RegExp(key));checks++;};
 await login(null);eq((await act('member-profile',profile)).status,401);

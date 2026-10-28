@@ -1,11 +1,7 @@
-import { mkdir, copyFile, readFile, writeFile } from 'node:fs/promises';
-import { zipSync, unzipSync } from 'fflate';
+import { readFile } from 'node:fs/promises';
+import { saveDeployment } from './deployment-output.mjs';
 
-const output = new URL('../outputs/', import.meta.url);
 const source = new URL('../nas-webstation/server/routes.php', import.meta.url);
-const patch = new URL('board-origin-update/', output);
-await mkdir(new URL('server/', patch), { recursive: true });
-await copyFile(source, new URL('server/routes.php', patch));
 const instructions = `방명록·커뮤니티 different-origin 수정
 
 1. NAS의 /volume1/web/argo/server/routes.php를 먼저 다운로드해 백업합니다.
@@ -20,14 +16,8 @@ config.php와 DB 파일은 교체하지 않습니다.
 PHP 7.4.30: 단위 검사 41개 + HTTP 검사 80개 통과.
 실제 NAS 반영과 휴대폰 테스트는 업로드 후 진행해야 합니다.
 `;
-await writeFile(new URL('UPDATE.txt', patch), instructions);
-await writeFile(new URL('board-origin-update.zip', output), zipSync({
-  'server/routes.php': new Uint8Array(await readFile(source)),
-  'UPDATE.txt': new TextEncoder().encode(instructions),
-}));
-await copyFile(source, new URL('synology-webstation/server/routes.php', output));
-const fullZipPath = new URL('synology-webstation.zip', output);
-const fullZip = unzipSync(new Uint8Array(await readFile(fullZipPath)));
-fullZip['server/routes.php'] = new Uint8Array(await readFile(source));
-await writeFile(fullZipPath, zipSync(fullZip, { level: 6 }));
-console.log('Prepared outputs/board-origin-update.zip and refreshed full deployment package.');
+await saveDeployment({name:'HOME_게시판_수정',files:{
+  'server/routes.php':new Uint8Array(await readFile(source)),
+  'UPDATE.txt':new TextEncoder().encode(instructions),
+},guide:instructions});
+await import('./build-webstation.mjs');
